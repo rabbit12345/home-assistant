@@ -1,0 +1,317 @@
+esphome:
+  name: actron
+  friendly_name: actron
+
+  includes:
+    - led_proto3.h
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+  level: DEBUG #INFO
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret esphome_api_key
+
+ota:
+  - platform: esphome
+    password: !secret esphome_ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Actron Fallback Hotspot"
+    password: "uEO7PM6vKUfU"
+
+captive_portal:
+
+web_server:
+  port: 80
+ 
+ 
+#Setup i2c bus to control MCP4725
+#https://esphome.io/components/i2c#i2c
+i2c:
+  - id: bus_a
+    sda: GPIO25
+    scl: GPIO26
+    scan: true
+  
+
+#MCP4725 output to Send Voltages for key presses 
+#https://esphome.io/components/output/mcp4725
+output:
+  - platform: mcp4725
+    id: dac_output
+    address: 0x60
+
+##***TESTING***
+# Define a number input component to output mV to the DAC
+number:
+  - platform: template
+    name: "DAC Output miliVolts"
+    min_value: 0
+    max_value: 4930  # Adjust this value according to the DAC's range
+    step: 1    # Adjust the step size as needed
+    restore_value: true
+    optimistic: true
+    on_value:
+      then:
+        lambda: |-
+          id(dac_output).set_level((x / id(dac_max)));
+
+globals:
+  - id: dac_value
+    type: double
+  - id: dac_max
+    type: double
+    initial_value: "4390.0"
+  - id: prev_fan
+    type: std::string
+    initial_value: '"Unset"'
+
+button:
+  - platform: template
+    name: "Press"
+    id: press_button
+    internal: true
+    icon: mdi:power
+    on_press:
+      - logger.log: Button Pressed
+      - lambda: |-
+          id(dac_output).set_level((id(dac_value) / id(dac_max)));
+      - delay: 500ms
+      - lambda: |-
+          id(dac_output).set_level((0.0 / id(dac_max)));
+      - delay: 500ms
+
+  - platform: template
+    name: "Temp Up"
+    icon: mdi:thermometer-plus
+    on_press:
+      - lambda: |-
+          id(dac_value) = 1334.0;
+          id(press_button).press();
+
+  - platform: template
+    name: "Temp Down"
+    icon: mdi:thermometer-minus
+    on_press:
+      - lambda: |-
+          id(dac_value) = 1061.0;
+          id(press_button).press();
+
+  - platform: template
+    name: "Mode"
+    icon: mdi:air-conditioner
+    on_press:
+      - lambda: |-
+          id(dac_value)=943.0;
+          id(press_button).press();
+
+  - platform: template
+    name: "Fan"
+    icon: mdi:fan
+    on_press:
+      - lambda: |-
+          id(dac_value) = 1566.0;
+          id(press_button).press();
+
+
+switch:
+  - platform: template
+    name: Power
+    icon: mdi:power
+    id: power
+    turn_on_action:
+      - lambda: |-
+          id(dac_value) = id(dac_max);
+          id(press_button).press();
+    turn_off_action:
+      - lambda: |-
+          id(dac_value) = id(dac_max);
+          id(press_button).press();
+    lambda: |-
+      return (id(cool).state or id(auto_md).state or id(heat).state or id(fan_cont).state or id(fan_hi).state or id(fan_mid).state or id(fan_low).state);
+
+
+  - platform: template
+    name: "Upstairs"
+    id: upstairs
+    icon: mdi:home-floor-2
+    turn_on_action:
+      - lambda: |-
+          id(dac_value) = 922.0;
+          id(press_button).press();
+    turn_off_action:
+      - lambda: |-
+          id(dac_value) = 922.0;
+          id(press_button).press();
+    lambda: return id(upstairs).state;
+
+  - platform: template
+    name: "Kitchen"
+    id: kitchen
+    icon: mdi: kitchen
+    turn_on_action:
+      - lambda: |-
+          id(dac_value) = 781.0;
+          id(press_button).press();
+    turn_off_action:
+      - lambda: |-
+          id(dac_value) = 781.0;
+          id(press_button).press();
+    lambda: return id(kitchen).state;
+
+  - platform: template
+    name: "Living room"
+    id: living_room
+    icon: mdi: sofa-outline
+    turn_on_action:
+      - lambda: |-
+          id(dac_value) = 863.0;
+          id(press_button).press();
+    turn_off_action:
+      - lambda: |-
+          id(dac_value) = 863.0;
+          id(press_button).press();
+    lambda: return id(living_room).state;
+
+
+sensor:
+  - platform: template
+    name: "Setpoint Temperature"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    id: setpoint_temp
+    state_class: measurement
+    icon: mdi:thermometer
+
+  - platform: template
+    name: "Bit Count"
+    id: bit_count
+    state_class: measurement
+    accuracy_decimals: 0
+
+
+text_sensor:
+  - platform: template
+    name: "Bit String"
+    id: bit_string
+    internal: true
+  - platform: template
+    name: "Fan Mode"
+    update_interval: 1s
+    lambda: |-
+      std::string current_fan = "";
+      if (id(fan_hi).state and !id(fan_cont).state) {
+        current_fan="High";
+      } else if (id(fan_mid).state and !id(fan_cont).state) {
+        current_fan="Medium";
+      } else if (id(fan_low).state and !id(fan_cont).state) {
+        current_fan="Low";
+      } else if (id(fan_hi).state and id(fan_cont).state) {
+        current_fan="High Cont";
+      } else if (id(fan_mid).state and id(fan_cont).state) {
+        current_fan="Medium Cont";
+      } else if (id(fan_low).state and id(fan_cont).state) {
+        current_fan="Low Cont";
+      } else {
+        current_fan="Off";
+      }
+      if (current_fan.compare(id(prev_fan)) != 0) {
+        id(prev_fan) = current_fan;
+        return {current_fan};
+      }
+      return {};
+
+
+binary_sensor:
+  - platform: template
+    name: "Cool"
+    icon: mdi:snowflake
+    id: cool
+  - platform: template
+    name: "Auto"
+    icon: mdi:flash-auto
+    id: auto_md
+  - platform: template
+    name: "Room5"
+    id: room5
+  - platform: template
+    name: "Run"
+    icon: mdi:run
+    id: run
+  - platform: template
+    name: "Room8"
+    id: room8
+  - platform: template
+    name: "Room7"
+    id: room7
+  - platform: template
+    name: "Room6"
+    id: room6
+  - platform: template
+    name: "timer"
+    id: timer
+  - platform: template
+    name: "Fan Continuous"
+    icon: mdi:fan-chevron-up
+    id: fan_cont
+  - platform: template
+    name: "Fan Hi"
+    icon: mdi:fan-speed-3
+    id: fan_hi
+  - platform: template
+    name: "Fan Mid"
+    icon: mdi:fan-speed-2
+    id: fan_mid
+  - platform: template
+    name: "Fan Low"
+    icon: mdi:fan-speed-1
+    id: fan_low
+  - platform: template
+    name: "Living"
+    id: room3
+  - platform: template
+    name: "Room4"
+    id: room4
+  - platform: template
+    name: "Kitchen"
+    id: room2
+  - platform: template
+    name: "Heat"
+    icon: mdi:fire
+    id: heat
+  - platform: template
+    name: "Upstairs"
+    id: room1
+  - platform: template
+    name: "Inside"
+    id: inside
+
+
+#Populate all template sensors from lambda custom component
+#First argument of KeypadStatus is the pin number of the ADC input
+custom_component:
+  - lambda: |-
+      auto keypad_status = new KeypadStatus(33,
+                                            id(bit_string), id(setpoint_temp), id(bit_count),  
+                                            id(cool), id(auto_md), id(room5), id(run), 
+                                            id(room8), id(room7), id(room6), id(timer), 
+                                            id(fan_cont), id(fan_hi), id(fan_mid), id(fan_low), 
+                                            id(room3), id(room4), id(room2), id(heat), 
+                                            id(room1), id(inside)
+                                            );
+      return {keypad_status};
+    components:
+      id: keypad_status
