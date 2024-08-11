@@ -1,0 +1,349 @@
+
+# Configure a default setup of Home Assistant (frontend, api, etc)
+default_config:
+
+homeassistant:
+  external_url: "https://ha.coremedical.com.au"
+  auth_providers:
+    - type: homeassistant
+  customize:
+    sensor.house_power_consumption:
+      state_class: total_increasing
+      
+frontend:
+  themes: !include_dir_merge_named themes
+
+satel_integra:
+  host: 10.0.1.121
+  port: 7091
+  code: 1177
+  partitions:
+    01:
+      name: "House"
+      arm_home_mode: 1
+    02:
+      name: "Fibaro"
+  zones:
+    01:
+      name: "lounge"
+      type: "motion"
+    02:
+      name: "study"
+      type: "motion"
+    03:
+      name: "upstairs"
+      type: "motion"
+    04:
+      name: "kitchen"
+      type: "motion"
+      
+person:
+  - name: lillian
+    id: lillian_id
+    device_trackers:
+      - device_tracker.lillian_iphone13promax
+http:
+  #server_port: 58123
+  #ssl_certificate: /etc/letsencrypt/live/hass.example.com/fullchain.pem
+  #ssl_key: /etc/letsencrypt/live/hass.example.com/privkey.pem
+  cors_allowed_origins:
+    - ha.coremedical.com.au
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 10.0.1.0/24
+  #ip_ban_enabled: true
+  #login_attempts_threshold: 5
+  
+# Text to speech
+tts:
+  - platform: google_translate
+
+group: !include groups.yaml
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+fibaro:
+  gateways:
+    - url: http://10.0.1.115/api/
+      username: jay@powerun.com   
+      password: 753951Qqq
+      
+sensor:
+  - platform: rest
+    resource: https://10.0.1.117/ivp/meters/readings
+    name: Power Solar Production
+    force_update: true
+    unique_id: power_solar_production_id
+    scan_interval: 10
+    value_template: "{{ value_json[0].activePower | float(0) }}"
+    headers:
+      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxNzUyMzY3MTU0LCJpYXQiOjE3MjA4MzExNTQsImp0aSI6ImNhN2FhN2QzLTIwOTktNDBiMy1iNTNhLWFhM2FjMjcyYzE5OSIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.vv-L0b_VHo_ZVGsuKXaHw-IEigcAT4vdMWTYBzxR16QFRNpjKZNy2ohtZ2-jP6xL8wPzSmKTWnHN-IiOYci_YA
+    verify_ssl: False
+    state_class: measurement
+    device_class: power
+    unit_of_measurement: W
+    json_attributes_path: "$.[0]"
+    json_attributes:
+      - "eid"
+      - "apparentPower"
+      - "timestamp"
+      - "voltage"
+      - "current"
+      - "freq"
+
+  - platform: rest
+    name: Power House Consumption
+    unique_id: power_house_consumption_id
+    resource: "https://10.0.1.117/ivp/meters/reports/consumption"
+    method: GET
+    force_update: true
+    scan_interval: 10
+    value_template: "{{ value_json[0].cumulative.actPower | float(0) }}"
+    headers:
+      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxNzUyMzY3MTU0LCJpYXQiOjE3MjA4MzExNTQsImp0aSI6ImNhN2FhN2QzLTIwOTktNDBiMy1iNTNhLWFhM2FjMjcyYzE5OSIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.vv-L0b_VHo_ZVGsuKXaHw-IEigcAT4vdMWTYBzxR16QFRNpjKZNy2ohtZ2-jP6xL8wPzSmKTWnHN-IiOYci_YA
+    verify_ssl: False
+    state_class: measurement
+    device_class: power
+    unit_of_measurement: W
+    json_attributes_path: "$.[1].cumulative"
+    json_attributes:
+      - "currW"
+      - "apprntPwr"
+      - "whDlvdCum"
+      - "rmsVoltage"
+      - "rmsCurrent"
+
+  - platform: rest
+    resource: https://10.0.1.117/ivp/meters/reports/consumption
+    name: Power Net Consumption
+    force_update: true
+    unique_id: power_net_consumption_id
+    scan_interval: 10
+    value_template: "{{ value_json[1].cumulative.actPower | float(0) }}"
+    headers:
+      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxNzUyMzY3MTU0LCJpYXQiOjE3MjA4MzExNTQsImp0aSI6ImNhN2FhN2QzLTIwOTktNDBiMy1iNTNhLWFhM2FjMjcyYzE5OSIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.vv-L0b_VHo_ZVGsuKXaHw-IEigcAT4vdMWTYBzxR16QFRNpjKZNy2ohtZ2-jP6xL8wPzSmKTWnHN-IiOYci_YA
+    verify_ssl: False
+    state_class: measurement
+    device_class: power
+    unit_of_measurement: W
+    json_attributes_path: "$.[1].cumulative"
+    json_attributes:
+      - "currW"
+      - "apprntPwr"
+      - "whDlvdCum"
+      - "rmsVoltage"
+      - "rmsCurrent"
+      
+  - platform: integration
+    name: Energy Solar Production
+    unique_id: energy_solar_production_id
+    source: sensor.power_solar_production
+    unit_time: h
+    unit_prefix: k
+    method: left
+
+  - platform: integration
+    name: Energy House Consumption
+    unique_id: energy_house_consumption_id
+    source: sensor.power_house_consumption
+    unit_time: h
+    unit_prefix: k
+    method: left
+
+  - platform: integration
+    name: Energy Net To Grid
+    unique_id: energy_net_to_grid_id
+    source: sensor.power_net_to_grid
+    unit_time: h
+    unit_prefix: k
+    method: left
+
+  - platform: integration
+    name: Energy Net From Grid
+    unique_id: energy_net_from_grid_id
+    source: sensor.power_net_from_grid
+    unit_time: h
+    unit_prefix: k
+    method: left
+   
+  - platform: template
+    sensors:
+        
+      power_net_to_grid:
+        friendly_name: "Power Net To Grid"
+        unique_id: power_net_to_grid_id
+        unit_of_measurement: W
+        value_template: >-
+          {% set p = states('sensor.power_solar_production') | float(0) %}
+          {% set c = states('sensor.power_house_consumption') | float(0) %}
+          {% if p > c %} {{ states('sensor.power_solar_production') | float(0) - states('sensor.power_house_consumption') | float(0) }}
+          {% else %} 0
+          {% endif %}
+    
+      power_net_from_grid:
+        friendly_name: "Power Net From Grid"
+        unique_id: power_net_from_grid_id
+        unit_of_measurement: W
+        value_template: >-
+          {% set p = states('sensor.power_solar_production') | float(0) %}
+          {% set c = states('sensor.power_house_consumption') | float(0) %}
+          {% if p < c %} {{ states('sensor.power_house_consumption') | float(0) - states('sensor.power_solar_production') | float(0) }}
+          {% else %} 0
+          {% endif %}
+
+  - platform: rest
+    name: 'Piano Room Curtain Position'
+    unique_id: "piano_room_curtain_position_id"
+    resource: !secret switchbot_curtain1_status_url
+    method: GET
+    scan_interval: 600
+    headers:
+      Authorization: !secret switchbot_api
+      Content-Type: 'application/json'
+    value_template: '{{ value_json.body.slidePosition }}'
+    json_attributes_path: "$.body"
+    json_attributes:
+      - deviceId
+      - deviceType
+      - hubDeviceId
+      - calibrate
+      - group
+      - moving
+      - slidePosition
+      
+cover:
+  - platform: template
+    covers:
+      study_blind_1:
+        friendly_name: "Study Blind 1"
+        unique_id: study_blind_1_id
+        open_cover:
+          service: remote.send_command
+          target:
+            entity_id: remote.rm3_pro
+          data:
+            command: b64:sgGEAw0JDQgOCA0JDQkNCA4IDggNCQ0IDggOCA0IDggOCA0JDQkNCA4IDggOCA0IDggOCA0JDQgOCA4IDQgOCA4IDQkNCA4IDggNCA4JDQgOCA4IDQgOCA4IDggNCA4IDggNCQ0IDggNCQ0JDQgOCA4IDQkNCA4IDggNCQ0IDggOCA0IDggOCA4IDgcOCA4IDggNCA4IDggNCQ0IDggOCA0JDQkNCA4IDggNCQ0IDggOCA0JDQgOCA4IDQgOCA4IDggNCQ0IDggOCA0JDQgOCA4IDQgOCA4IDggOCA0IDggOCA0JDQgOCA4IDQkNCA4IDggNCQ0IDggOCA0JDQkNCA4IDggNCA4IDggNCQ0IDggOCA4IDQkNCA4IDggNCQ0IDggOCA0IDggOCA4IDQkNCA4IDggNCQ0JDQgOCA0IDggOCA0JDQkNCQ0IDggOCA0IDggOCA0JDQgOCA4IDQgNCQ0JDAoMCQ0JDAoMCgwJDAoMCQ0JDAoMCgwJDQkMCgwJDQkMCgwKDAkMCgwKDAkOCA4IDQkNCA4IDggNCA4IDggNCQ0JDQkNCA4IDgcOCA4IDggOCA0IDggOCA0JDQkNCA4IDggNCQ0IDggOCA0JDQgOCA4IDQgOCA4JDQgNCQ0JDQgOCA4IDQkNCA4IDggOCA0JDQgOCA0JDQkNCA4IDggNCQ0IDggOCA0JDQgOCA4IDggNCA4IDggOCA0IDggOCA4IDQkNCQ0IDQkNCQ0IDggOCA4IDQgOCA4IDQkNCQ0IDggNCQ0JDQgOCA4IDQkNCQ0IDggNCQ0JDQgOCA4IDQgOCA4IDggNCA4JDQgNCQ4IDQgOCA4IDRQWFRYWFhUWFRcVFhUWFhUWFhUWFRYVWVYWFBcVFisWFRYVFxUsFRYVFxUWKi0qLCsWFRYVLCssFRcVFioXFSwqFxUWFRYVFxUWFRYWLCoWFSwrLCsWFRYWFhUWFRYVFxUWFRYVFxUWFRcUFxQXFRYVWVUWFRYVFyoWFRcVFhUsFhYVFhUWKywrLCoXFRYVLCotFRYWFioWFSwrFhUWFRcVFhUXFRYVLCoXFSwrLCoXFRYVFhUXFRYVFhYWFRYVFxUWFRYVFhUWFhYVWVUWFRYWFioWFRcVFhUsFRcVFhUWKywrLCoXFRUWLCssFhUVFyoWFSwrFhUWFhYVFhUXFRYVLCsWFSwrLCsWFRYVFgAF3AAAAAA=
+        close_cover:
+          service: remote.send_command
+          target:
+            entity_id: remote.rm3_pro
+          data:
+            command: >- 
+              b64:sgGEAw4IDQkNCQ0IDggOCA4HDggOCA4IDQkNCA4IDQkNCQ0IDggNCQ0JDQgOCA4IDQkNCA4IDggNCA4IDggNCA4IDggOCA4IDQgOCA4IDQgOCA4IDggOCA0IDggOCA0IDggOCA0IDgkNCA4IDggNCA4IDggNCQ0IDggOCA0JDQkNCA4IDQkNCA4IDggOCA0IDggOCA4HDggOCA4IDQkNCQ0IDggOCA0IDggOCA0IDggOCA4IDQkNCA4IDggOCA0IDggOCA0JDQgOCA4IDQgOCA4IDggNCQ0IDggOCA0IDggOCA0JDQgOCA4IDQkNCQ0IDggOBw4IDggOCA0JDQgOCA4IDQgOCA4IDggOCA0IDggNCQ0JDQgOCA4IDQkNCQ0IDggNCQ0JDQgOCA4HDggOCA4IDQgOCA4IDggNCQ0JDQgOCA0JDQgOCA4IDQgOCA4IDggOCA0IDggOCA0IDggOCA4IDQkNCA4IDhMWFRcVFhUWFhUWFhUXFBcUFxUWFRYVWVYVFhYVFioWFhYVFhUtFBcVFhUXKiwrLCoWFRcVLCotFRYVFisWFSwVFyoWFRYVFxUWFRYVLRUWKi0qLCsWFRYVFxUWFRYVFhUXFRYVFhUXFRYVFhUWFhYVWFYWFRYVFisWFRYVFhUtFRYVFxQXKiwrLCoXFRYVLCssFRcVFioWFSwVFyoXFBcVFhUXFBcVLBUXKS0qLSoWFRcVFhUWFRcVFhUWFRYVFxUWFRYVFxUWFRYVWVUXFBYVFyoWFRYWFhUsFRcVFhUWKi0qLCsWFRYVLSosFRcVFioXFC0VFioXFRYVFhUXFRYVLBYWKiwrLCsWFRYVFhUWFhYVFhUXFBcVFhUXFBcVFhUWFRcUWVYWFRYVFyoWFRcUFxQtFRcUFxUWKi0qLCsWFRYVLSosFRcVFisVFiwVFisWFRYVFhUXFRYVLBUXKi0qLCsWFRYVFxQXFRYVFhYWFRYVFhYWFRYVFhUXFRYVWVUWFRcVFioXFBcVFhUsFRcVFhUWKywqLSoWFRcVLCotFRYVFyoWFSwVFisWFRcVFhUWFRcVLBUWKywrLCoWFhUWFhUWFRcUFxUWFRcUFxUWFhYUFxUWFRYVWVYWFRYVFioXFRYVFxUsFRcUFxUWKiwrLCsWFRYVLSosFhYVFisWFSwVFisWFRYWFhUWFRYVLRUWKi0qLCsXFRUVFwAF3AAAAAA=
+        stop_cover:
+          service: remote.send_command
+          target:
+            entity_id: remote.rm3_pro
+          data:
+            command: >- 
+              b64:sgGEAw0IDggOCA4HDggOCA0IDggOCA4IDggNCA4IDQkNCQ0IDggOCA0JDQkNCA4IDgcOCA4IDgcOCA4IDggOCA4HDggOCA4IDQgOCA4IDQkOCA0IDggOCA0IDggOCA4IDQgOCA4IDQkNCA4IDggOCA0IDggOCA4IDQgOCA4IDQkNCA4IDggNCA4IDggNCQ0JDQgOCA4IDQkNCA4IDggOCAwJDAoMCQ0JDAoMCgwJDQkMCgwJDQkMCgwJDAoMCgwKDAkMCgwKDAkMCgwJDQkOCA4IDQkNCA4IDQkNCA4IDggOCA0JDQgOCA4IDggNCA4IDggNCQ0IDggOCA4IDQgOCA4IDQgOCA4IDggOBw4IDggOCA0JDQgOCA4IDggNCA4IDggOCA0JDQgOCA4IDgcOCA4IDggOBw4IDggOCA0IDggOCA4IDQgOCA4IDggNCA4IDggOCA4IDQgOCA4IDQkNCQ0IDggNCQ0IDggOCA0JDQgOCA4IDgcOCA4IDggNCQ0JDQgOCA4IDQkNCA4IDQkNCQ0IDggOCA4IDQgOCA4IDQgPBw4IDggNCQ0JDQgOCA4IDQgOCA4IDggNCA4IDggOCA0JDQkNCA4IDggNCA4IDggOBw4JDQgOCA0JDQgOCA0JDQkNCQ0IDQkOCA0IDggOCA0JDQkNCA4IDQkOBw4IDggNCQ0IDggOCA4IDQgOCA4IDggNCQ0IDggOCA4IDQgOCQ0IDQkNCA4IDggNCQ0JDQgOCA4IDQkNCA4IDggNCQ0IDggOCA0JDQgOCA0JDQkNCQ0IDggNCQ0IDggOCA4IDQgOCA4IDQgOCA4IDggOCA0IDggOCA4IDhMWFRYVFxUWFRYWFhUWFRcUFxUWFRYVWVYWFBcVFioXFRYVFhUtFRYVFhUXKiwrLCsWFRYVLCssFRYVFyoWFRcVLCoXFRYVFhUXFBcVFhUtKiwrLCsWFRYVFhUWFRcVFhUXFRYVFhUXFRYVFhUWFhYVWVUWFRYVFyoWFRYVFxUsFRcUFxUWKywqLCsWFRYVLSosFhYVFisWFRYVLSoWFRYVFxUWFRYVFxUsKi0qLSoWFRcUFxUWFRcUFxUWFRYWFhUWFRcUFxUWFRYVWVYWFRYVFisWFRYVFxUsFRcUFxUWKi0qLCsWFRcULSosFhYVFisWFRYVLSoWFRcVFhUWFRcVFhQtKywqLSoWFRcVFgAF3AAAAAA=
+            
+      study_blind_2:
+        friendly_name: "Study Blind 2"
+        unique_id: study_blind_2_id
+        open_cover:
+          service: remote.send_command
+          target:
+            entity_id: remote.rm3_pro
+          data:
+            command: b64:sgGEAw0IDggOCA4IDQgOCA4IDggNCA4IDggNCQ0JDQkNCA4IDQkNCA4IDggOBw4IDggOCA0JDQgOCA4IDggNCA4IDggNCQ0IDggOCA0JDggNCA4IDggNCA4IDggNCQ0IDggOCA4IDQkNCA4IDggNCQ0IDggOCA4HDggOCA4IDQgOCA4IDggOCA0IDggOCA0JDQgOCA4IDggNCQ0IDggNCQ0IDggOCA4IDQkNCA4IDggOCA0IDggOCA4IDQgOCA4IDggNCA4IDggOCA0JDQgOCA4IDQgOCA4IDggOCA0IDggOCA4HDggOCA4IDggNCA4JDQgOCA0IDggOCA0JDQkNCA4IDggOCA0JDQgOCA4IDgcOCA4IDggNCQ0IDggOCA4IDQgOCA4IDQkNCQ0IDggNCQ4IDQgOCA4IDQgOCA4IDggOBw4IDggOCA0JDgcOCA4IDggNCQ0IDggOCA0IDggOCA4IDQkNCA4IDggOCA0IDggOCA4IDQkNCA4IDggNCQ0JDQgOCA4IDQgOCA4IDggNCQ0IDggNCQ0JDQgOCA4IDggNCA4IDggOCA4HDggOCA4IDQkNCA4IDQkNCQ0IDggOCA0JDQkNCA4IDggOBw4IDggOCA0IDggNCQwKDAoMCQwKDAoMCQwKDAoMCgwJDAoMCgwJDQkMCgwJDQkMCgwKDAkNCQwKDgcOCA4IDQgOCA4IDggOBw4IDggOCA4IDQkNCA4IDggOCA4HDggOCA4IDgcOCA4IDggNCQ0JDQgOCA4IDQkNCA4IDggNCQ0IDggOCA4IDQgOCA4IDggNCQ0JDQgOCA4IDgcOCA4IDggNCA4IDggOCA0JDggNCA4IDhMXFBcVFhUXFRYVFhUXFRYVFhUWFhYVWVYVKhcVLCsWFRYVLRUWFRYWFiosKywrFhUWFSwrLBUXFRYrFhUsKxYUFxUWFRcVFhUXFBcVLCssKywqFxUVFhYVFhUXFRYVFxUWFRYVFxUWFRYVFxQXFVlVFisWFC0qFxUWFS0VFhUWFRcqLCssKxYVFhUsKywVFxUWKxYVLCoXFRYVFxUWFRYWFRYWFSwrLCssKxYVFhUWFRcVFhUWFRcVFhUXFRYVFhUXFBcVFhVZVhYqFhUtKhcVFhUsFRYWFhUWKywrLCoXFRYVLCssFRYVFyoXFSwqFxUWFRYVFxUWFRcUFxUsKywqLCsWFRYVFwAF3AAAAAA=
+        close_cover:
+          service: remote.send_command
+          target:
+            entity_id: remote.rm3_pro
+          data:
+            command: >- 
+              b64:sgGEAw4IDggNCQ0JDQgNCQ0JDQgNCQ0JDQgNCQ0JDQgOCA0JDQkNCA4IDQgOCA4IDQkNCQ0IDQkNCA4IDggNCQ0IDggNCQ0JDQgOCA0JDQgOCA0JDQkNCA0JDQgOCA4IDQkNCQwJDQkNCA4IDggNCQ0IDggNCQ0JDQgOCA0JDQgNCQ0JDQgOCA0JDQgOCA4IDQkNCA4IDQkNCQ0IDQkNCA4IDggNCQ0JDQgNCQ0IDggOCA0JDQgOCA4IDQgOCA4IDggNCA4IDQkNCA4IDggNCQ0IDggNCQ0IDggNCQ0JDQgOCA4IDQgOCA4IDQkNCA4IDggNCQ0IDQkNCQ0IDQkNCQ0IDggOCA0JDQgOCA0JDQgOCA0JDQgOCA4IDQkNCQwJDQkNCQ0IDQkNCQ0IDggNCQ0JDQgOCA0IDggOCA0JDQgOCA4IDQkNCA4IDggNCQ0IDggNCQ0IDggNCQ0IDggNCQ0JDQgOCA4IDQkNCA4IDggNCA4IDggNCA4IDggNCQ0IDggNCQ0JDQgOCA4IDQgOCA4IDQkNCA4IDQkNCQ0IDggNCQ0IDggNCQ0IDggOCA0JDQgOCA0JDQkNCQwJDQkNCA4IDggNCQ0IDggOCA0IDggOCA0JDQkNCA0JDQkNCA4IDQkNCA4IDQkNCQ0JDAkNCQ0IDggNCQ0JDQgOCA4IDQkNCA4IDQkNCA4IDggNCA4IDggNCQ0JDQgNCQ0JDRQWFRYVFhYWFRYVFhUWFhYVFhUWFRYVWVUWKhcVLCoXFRYVLBUWFRYVFyosKywqFhYVFiwrKxYWFRYrFRYsFRYrFhUWFRYVFhUXFRYVFhUsFRYrLCsWFRYVFhUWFRcVFhUWFRYWFhUWFRYVFhUWFhYVWFYWKhYVLCsWFRYVLBYWFRYVFisrKywrFhUWFSwrLBUWFRYrFhUsFRYrFhUWFRcVFhUWFRYVFxUsFRYrLCoWFRYVFhYWFRYVFhYWFRYVFhUWFhYVFhUWFRYWWFYVKxUWKysXFRYVLBUWFRYVFyosKywrFRYWFSwrLBUWFRYrFhUsFRYrFhUWFRYWFhUWFRYVFhUsFhYqLCsWFRYVFhUWFhYVFhUXFRYVFhUWFhUVFxUWFRYWV1YWKxUWLCsVFRcVLBUWFRYWFiosKywrFRYWFSsrLBYWFRYrFhUsFRYrFhUWFRYVFhYWFRYVFhUsFhYqLCsWFRYVFgAF3AAAAAA=
+        stop_cover:
+          service: remote.send_command
+          target:
+            entity_id: remote.rm3_pro
+          data:
+            command: >- 
+              b64:sgGEAw0IDggOCA0IDggOCA4IDgcOCA4IDggNCA4IDQkOCA0IDggOCA4IDQgOCA4IDQgOCA4IDQgOCA4IDggOBw4IDggNCQ0JDQgOCA4HDggOCA4IDQkNCA4IDggNCA4IDggOCA0JDQgOCA0JDggNCA4IDQkNCA4IDggNCA4IDggOCA4HDggOCA4IDQgOCA4IDggNCQ0IDggOCA0IDggOCA4IDQgOCA4IDQkNCA4IDggNCA4IDggOCA0JDQgOCA4IDQgOCA4IDQkNCA4IDggOCA0IDggNCQ0JDQgOCA4IDggNCA0JDAoMCQ0JDQkMCQ0JDAoMCQwKDQkMCgwJDQkMCQ0JDAoMCQ0JDAoMCgwJDQkPBw0IDggOCA4HDggOCA4IDQgOCA4IDggOCA0IDggOCA0JDQgOCA4IDggOBw4IDggOBw4IDggOCA4IDQgOCA4IDggOCA0IDggOCA0JDQgOCA4IDQgOCA4IDgcOCA4IDggOCA0IDggOCA4IDQgOCA4IDggNCA4IDggOCA4HDwcOCA4IDgcOCA4IDggOCA0IDggOCA4IDQgOCA4IDggNCA4IDggOBw4IDggOCA0IDggOCA4IDgcOCA4IDggNCQ0IDggOCA0JDQkNCA4IDggNCA4IDggOCA0IDggOCA0IDwgNCA4IDggNCA4IDggOCA0JDQgOCA4IDQgOCA4IDggNCA4IDggOCA0IDggOCA4IDQkNCA4IDggNCQ0IDggOCA0JDQgOCA4IDQgOCA4IDggOBw4IDggNCQ0JDQkNCA4IDgcOCA4IDggNCQ0IDggOCA0IDggOCA4IDQgOCA4IDQkNCQ0IDggOCA0JDQgOCA4IDRQWFRcVFhUWFRcVFhUWFRcUFxUWFRYVWVUXKhYVLCsWFRYVLRUWFRYVFissKi0qFxUWFC0rLBUWFRcqFhUWFS0qFxUWFRYVFxQXFSwVFissKywqFxQXFRYVFhUXFRYVFhUXFRYVFhUXFBcVFhUXFFlWFioWFSwrFhUXFSwVFhUWFRcqLSosKxYVFhUsKywVFxQXKhYWFhUsKhcVFhUXFBcVFhUsFRcqLCssKhcVFhUWFRcVFhUXFBcVFhUWFRcVFhUWFRcUFxVZVRYrFhQtKhcVFhUtFRYVFhUXKiwqLSoXFRYVLCotFRcUFyoWFRYVLSoXFBcVFhUXFRYVLBUXKiwrLCoXFRYVFgAF3AAAAAA=
+
+  - platform: cover_rf_time_based
+    devices:
+      study_blind_1_tb:
+        name: "Study blind 1 TB"
+        travelling_time_up: 36
+        travelling_time_down: 34
+        cover_entity_id: cover.study_blind_1
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+        
+      study_blind_2_tb:
+        name: "Study blind 2 TB"
+        travelling_time_up: 36
+        travelling_time_down: 34
+        cover_entity_id: cover.study_blind_2
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+        
+  - platform: template
+    covers:
+      pianoroom_curtains:
+        device_class: curtain
+        friendly_name: "piano_room_curtain_id"
+        unique_id: power_house_consumption_id
+        position_template: "{{ states('sensor.piano_room_curtain_position') }}"
+        open_cover:
+          service: rest_command.switchbot_device_command
+          data:
+            deviceId: !secret switchbot_curtain1_deviceId
+            command: "turnOn"
+        close_cover:
+          service: rest_command.switchbot_device_command
+          data:
+            deviceId: !secret switchbot_curtain1_deviceId
+            command: "turnOff"
+        stop_cover:
+          service: rest_command.switchbot_device_command
+          data:
+            deviceId: !secret switchbot_curtain1_deviceId
+            command: "turnOff"
+        set_cover_position:
+          service: rest_command.switchbot_device_command
+          data:
+            deviceId: !secret switchbot_curtain1_deviceId
+            command: "setPosition"
+            parameter: "0,ff,{{position}}"
+            
+rest_command:
+  switchbot_device_command:
+    url: 'https://api.switch-bot.com/v1.0/devices/{{ deviceId }}/commands'
+    method: post
+    content_type: 'application/json'
+    headers:
+      Authorization: !secret switchbot_api
+    payload: '{"command": "{{ command }}","parameter": "{{ parameter }}"}'
+    
+  envoy_test_command:
+    url: "https://10.0.1.117/ivp/meters/readings"
+    method: get
+    content_type: 'application/json'
+    headers:
+      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxNzIwMzM2MTczLCJpYXQiOjE2ODg4MDAxNzMsImp0aSI6IjIwNWZiNWIwLTJkZjEtNDg1YS04MjM3LTQ2Nzk3MmQ0ZGFmZCIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.WXXT7bDEO3ch7x6vLap8gV2rQMl_5SgBAIVuq6mbCZgDy1nIdXZffhCEAIKsw_ZYI1FIr4NI1_JJrewYM9BexQ
+    verify_ssl: false
+
+input_boolean:
+  auto_dyson_heater:
+    name: auto dyson heater
+    
+logger:
+  default: info
+  logs:
+    homeassistant.components.rest: debug
+    custom_components.ha_blueair: debug
+    blueair_api: debug
+    
+    
+    
+media_player:
+  - platform: webrtc
+    name: interphone
+    stream: doorbell
+    audio: pcma
