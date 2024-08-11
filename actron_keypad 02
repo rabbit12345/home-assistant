@@ -74,7 +74,7 @@ globals:
     type: double
   - id: dac_max
     type: double
-    initial_value: "4390.0"
+    initial_value: "4930.0"
   - id: prev_fan
     type: std::string
     initial_value: '"Unset"'
@@ -89,10 +89,10 @@ button:
       - logger.log: Button Pressed
       - lambda: |-
           id(dac_output).set_level((id(dac_value) / id(dac_max)));
-      - delay: 500ms
+      - delay: 800ms
       - lambda: |-
           id(dac_output).set_level((0.0 / id(dac_max)));
-      - delay: 500ms
+      - delay: 800ms
 
   - platform: template
     name: "Temp Up"
@@ -115,7 +115,7 @@ button:
     icon: mdi:air-conditioner
     on_press:
       - lambda: |-
-          id(dac_value)=943.0;
+          id(dac_value) = 943.0;
           id(press_button).press();
 
   - platform: template
@@ -124,6 +124,22 @@ button:
     on_press:
       - lambda: |-
           id(dac_value) = 1566.0;
+          id(press_button).press();
+
+  - platform: template
+    name: "Timer"
+    icon: mdi:timer-plus-outline
+    on_press:
+      - lambda: |-
+          id(dac_value) = 1264.0;
+          id(press_button).press();
+
+  - platform: template
+    name: "Select_down"
+    icon: mdi:arrow-down-bold
+    on_press:
+      - lambda: |-
+          id(dac_value) = 1128.0;
           id(press_button).press();
 
 
@@ -143,7 +159,6 @@ switch:
     lambda: |-
       return (id(cool).state or id(auto_md).state or id(heat).state or id(fan_cont).state or id(fan_hi).state or id(fan_mid).state or id(fan_low).state);
 
-
   - platform: template
     name: "Upstairs"
     id: upstairs
@@ -161,7 +176,7 @@ switch:
   - platform: template
     name: "Kitchen"
     id: kitchen
-    icon: mdi: kitchen
+    icon: mdi:kitchen
     turn_on_action:
       - lambda: |-
           id(dac_value) = 781.0;
@@ -175,7 +190,7 @@ switch:
   - platform: template
     name: "Living room"
     id: living_room
-    icon: mdi: sofa-outline
+    icon: mdi:sofa-outline
     turn_on_action:
       - lambda: |-
           id(dac_value) = 863.0;
