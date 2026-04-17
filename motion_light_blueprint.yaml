@@ -1,0 +1,463 @@
+blueprint:
+  name: "Motion Light: Time Window + State Restore"
+  description: >-
+    Activates a light on motion within a configurable time window. Window opens
+    via any combination of fixed start time, sunset offset, and sunrise offset.
+    Window end time is cross-midnight aware: a morning end (e.g. 02:00) correctly
+    closes a window that opened the previous evening.
+    Optional sun window gates the whole automation between sunset+offset and
+    sunrise+offset, replacing the dawn gate. Captures the light's prior state
+    and restores it after the on-duration. Re-triggers reset the timer.
+    Requires one Toggle helper per instance -
+    create at Settings > Devices & Services > Helpers > Toggle.
+  domain: automation
+  source_url: https://community.home-assistant.io/
+
+  input:
+
+    motion_sensors:
+      name: Motion Sensor(s)
+      description: One or more motion sensors. Any sensor going ON fires the trigger.
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
+          multiple: true
+
+    light_entity:
+      name: Light
+      description: The light to control.
+      selector:
+        entity:
+          filter:
+            domain: light
+
+    brightness_pct:
+      name: Brightness (%)
+      description: Target brightness when motion activates the light.
+      default: 80
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+          mode: slider
+
+    transition_on:
+      name: Turn-On Transition (seconds)
+      description: Fade-in duration. Use 0 for instant.
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 15
+          step: 0.5
+          unit_of_measurement: s
+          mode: slider
+
+    transition_restore:
+      name: Restore Transition (seconds)
+      description: Fade duration when restoring the prior light state.
+      default: 3
+      selector:
+        number:
+          min: 0
+          max: 30
+          step: 0.5
+          unit_of_measurement: s
+          mode: slider
+
+    duration_minutes:
+      name: On Duration (minutes)
+      description: Keep light on for this long after last motion. Re-trigger resets the timer.
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 120
+          step: 1
+          unit_of_measurement: min
+          mode: box
+
+    use_end_time:
+      name: Use Window End Time
+      description: >-
+        When ON, the automation will not activate after the Window End Time.
+        The check is cross-midnight aware — see Window End Time description.
+      default: true
+      selector:
+        boolean:
+
+    end_time:
+      name: Window End Time
+      description: >-
+        Latest time the automation can activate. Cross-midnight aware.
+        Evening end (e.g. 23:00): closes at 23:00 that same night and stays
+        closed until the following evening window opens — motion at 01:00 AM
+        will NOT re-open it.
+        Morning end (e.g. 02:00): closes at 02:00 the following morning,
+        correctly capping an overnight window that started the previous evening.
+        Only used when Use Window End Time is ON.
+      default: "23:00:00"
+      selector:
+        time:
+
+    use_sun_window:
+      name: Use Sunset/Sunrise Window
+      description: >-
+        When ON, the automation is only active between sunset (+ start offset)
+        and sunrise (+ end offset). Replaces the Dawn Gate.
+        When OFF, the Dawn Gate below is used instead.
+      default: false
+      selector:
+        boolean:
+
+    run_during_day:
+      name: Run During Day
+      description: >-
+        When ON, bypasses the Night Gate entirely so the automation can fire
+        at any hour regardless of sun position or the Sunset/Sunrise Window.
+        Useful for testing or always-on motion lighting.
+      default: false
+      selector:
+        boolean:
+
+    sun_window_start_offset:
+      name: Sunset Enable Offset (minutes)
+      description: >-
+        Minutes relative to sunset to enable the automation.
+        0 = exactly at sunset. Negative = before sunset. Positive = after sunset.
+        Only used when Use Sunset/Sunrise Window is ON.
+      default: 0
+      selector:
+        number:
+          min: -300
+          max: 600
+          step: 5
+          unit_of_measurement: min
+          mode: box
+
+    sun_window_end_offset:
+      name: Sunrise Disable Offset (minutes)
+      description: >-
+        Minutes relative to sunrise to disable the automation.
+        0 = exactly at sunrise. Negative = before sunrise. Positive = after sunrise.
+        Only used when Use Sunset/Sunrise Window is ON.
+      default: 0
+      selector:
+        number:
+          min: -300
+          max: 600
+          step: 5
+          unit_of_measurement: min
+          mode: box
+
+    use_fixed_start:
+      name: Use Fixed Window Start
+      description: >-
+        When ON activates after Fixed Start Time. Works across midnight.
+        Combined via OR with sunset and sunrise offsets.
+      default: true
+      selector:
+        boolean:
+
+    fixed_start_time:
+      name: Fixed Start Time
+      description: Activate after this clock time. Cross-midnight aware (only when Use Fixed Start is ON).
+      default: "18:00:00"
+      selector:
+        time:
+
+    use_sunset_offset:
+      name: Use Sunset Offset
+      description: >-
+        When ON activates X minutes after sunset.
+        Combined via OR with fixed start and sunrise offset.
+      default: true
+      selector:
+        boolean:
+
+    sunset_offset_minutes:
+      name: Sunset Offset (minutes)
+      description: >-
+        Minutes after sunset to open the window. Negative = before sunset.
+        Only used when Use Sunset Offset is ON.
+      default: 0
+      selector:
+        number:
+          min: -300
+          max: 600
+          step: 5
+          unit_of_measurement: min
+          mode: box
+
+    use_sunrise_start:
+      name: Use Sunrise Start Offset
+      description: >-
+        When ON activates X minutes before/after sunrise (e.g. pre-dawn lighting).
+        Combined via OR with fixed start and sunset offset.
+      default: false
+      selector:
+        boolean:
+
+    sunrise_start_offset_minutes:
+      name: Sunrise Start Offset (minutes)
+      description: >-
+        Minutes relative to sunrise to open the window.
+        Negative = before sunrise (e.g. -30 = 30 min before sunrise).
+        Only used when Use Sunrise Start Offset is ON.
+      default: -30
+      selector:
+        number:
+          min: -300
+          max: 600
+          step: 5
+          unit_of_measurement: min
+          mode: box
+
+    sunrise_close_offset_minutes:
+      name: Dawn Gate Close Offset (minutes)
+      description: >-
+        Adjusts when the Dawn Gate closes at dawn.
+        0 = close at sunrise. Positive = stay active N min after sunrise.
+        Negative = close N min before sunrise.
+        Ignored when Use Sunset/Sunrise Window is ON.
+      default: 0
+      selector:
+        number:
+          min: -60
+          max: 120
+          step: 5
+          unit_of_measurement: min
+          mode: box
+
+    active_boolean:
+      name: Active State Helper
+      description: >-
+        An input_boolean that tracks whether this automation is active.
+        Prevents re-triggers overwriting the saved prior light state.
+        Create at Settings > Devices & Services > Helpers > Toggle.
+        Use a unique helper per automation instance.
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
+
+
+variables:
+  light_var: !input light_entity
+  use_end_time_var: !input use_end_time
+  end_time_var: !input end_time
+  use_sun_window_var: !input use_sun_window
+  run_during_day_var: !input run_during_day
+  sun_window_start_offset_var: !input sun_window_start_offset
+  sun_window_end_offset_var: !input sun_window_end_offset
+  use_fixed_var: !input use_fixed_start
+  fixed_start_var: !input fixed_start_time
+  use_sunset_var: !input use_sunset_offset
+  sunset_offset_var: !input sunset_offset_minutes
+  use_sunrise_start_var: !input use_sunrise_start
+  sunrise_start_offset_var: !input sunrise_start_offset_minutes
+  sunrise_close_offset_var: !input sunrise_close_offset_minutes
+  scene_id_var: "motion_restore_{{ light_var | replace('.', '_') | replace('-', '_') | replace(' ', '_') }}"
+
+
+triggers:
+  - trigger: state
+    entity_id: !input motion_sensors
+    to: "on"
+
+
+condition:
+
+  # Guard 1: Cross-midnight-aware window end time.
+  # Bypassed entirely when Use Window End Time is OFF.
+  #
+  # The key insight: an evening end time (hour >= 12, e.g. 23:00) means
+  # "stop tonight". If the current clock is in the morning (hour < 12) and
+  # the end time is an evening hour, we have already passed that cutoff —
+  # return false so the cross-midnight window doesn't re-open after midnight.
+  #
+  # A morning end time (hour < 12, e.g. 02:00) means "stop next morning".
+  # If we are currently in the evening (hour >= 12) the cutoff is ahead of us
+  # — return true to keep the window open until that time arrives.
+  - condition: template
+    alias: "Window end time (cross-midnight aware)"
+    value_template: >-
+      {% if not (use_end_time_var | bool(true)) %}
+        true
+      {% else %}
+        {% set parts = end_time_var.split(':') %}
+        {% set eh = parts[0] | int %}
+        {% set em = parts[1] | int if parts | length > 1 else 0 %}
+        {% set end_today = now().replace(hour=eh, minute=em, second=0, microsecond=0) %}
+        {% set now_hour = now().hour %}
+        {% if eh >= 12 and now_hour < 12 %}
+          {# Evening end time, but it's already morning — window has closed #}
+          false
+        {% elif eh < 12 and now_hour >= 12 %}
+          {# Morning end time, currently evening — window not yet closed #}
+          true
+        {% else %}
+          {{ now() < end_today }}
+        {% endif %}
+      {% endif %}
+
+  # Guard 2: Night gate — bypassed entirely when Run During Day is ON.
+  #
+  # Mode A — Sun Window (use_sun_window ON):
+  #   Active only between (sunset + start_offset) and (sunrise + end_offset).
+  #   Below horizon: yesterday's sunset → today's upcoming sunrise.
+  #   Above horizon: today's upcoming sunset → tomorrow's sunrise (normally blocks
+  #   daytime triggers; a negative start_offset can open the window pre-sunset).
+  #
+  # Mode B — Dawn Gate (use_sun_window OFF):
+  #   Only active when sun is below horizon and we haven't passed
+  #   next_rising + close_offset. Above horizon always passes so the
+  #   fixed-start evening window is not blocked during the day.
+  #
+  # Mode C — Run During Day (run_during_day ON): always passes.
+  - condition: template
+    alias: "Night gate"
+    value_template: >-
+      {% if run_during_day_var | bool(false) %}
+        true
+      {% elif use_sun_window_var | bool(false) %}
+        {% set next_set  = state_attr('sun.sun', 'next_setting') | as_datetime | as_local %}
+        {% set next_rise = state_attr('sun.sun', 'next_rising')  | as_datetime | as_local %}
+        {% if states('sun.sun') == 'below_horizon' %}
+          {% set sunset_time  = next_set  - timedelta(hours=24) %}
+          {% set sunrise_time = next_rise %}
+        {% else %}
+          {% set sunset_time  = next_set %}
+          {% set sunrise_time = next_rise + timedelta(hours=24) %}
+        {% endif %}
+        {% set window_open  = sunset_time  + timedelta(minutes=sun_window_start_offset_var | int(0)) %}
+        {% set window_close = sunrise_time + timedelta(minutes=sun_window_end_offset_var   | int(0)) %}
+        {{ now() >= window_open and now() < window_close }}
+      {% else %}
+        {% if states('sun.sun') == 'below_horizon' %}
+          {% set next_rise = state_attr('sun.sun', 'next_rising') | as_datetime | as_local %}
+          {{ now() < next_rise + timedelta(minutes=sunrise_close_offset_var | int(0)) }}
+        {% else %}
+          true
+        {% endif %}
+      {% endif %}
+
+  # Guard 3: Window opener (OR — any one branch is sufficient).
+  # Branch D (run_during_day) bypasses the opener entirely.
+  - condition: or
+    conditions:
+
+      # Branch D: Run During Day — always passes when enabled.
+      - condition: template
+        alias: "Run during day (bypass opener)"
+        value_template: "{{ run_during_day_var | bool(false) }}"
+
+      # Branch A: Fixed start time, cross-midnight aware.
+      # Passes when now() >= today's fixed start time (evening use).
+      # Also passes when sun is below_horizon and now() >= yesterday's fixed start
+      # time, covering the post-midnight portion of the overnight window.
+      - condition: template
+        alias: "Fixed start (cross-midnight)"
+        value_template: >-
+          {% if not (use_fixed_var | bool(false)) %}
+            false
+          {% else %}
+            {% set parts = fixed_start_var.split(':') %}
+            {% set h = parts[0] | int %}
+            {% set m = parts[1] | int if parts | length > 1 else 0 %}
+            {% set start_today     = now().replace(hour=h, minute=m, second=0, microsecond=0) %}
+            {% set start_yesterday = start_today - timedelta(days=1) %}
+            {{ now() >= start_today
+               or (states('sun.sun') == 'below_horizon' and now() >= start_yesterday) }}
+          {% endif %}
+
+      # Branch B: Sunset + offset.
+      # Estimates today's sunset as next_setting - 24h when sun is below horizon.
+      # Handles negative offsets (activate before sunset) when sun is above horizon.
+      - condition: template
+        alias: "Sunset offset"
+        value_template: >-
+          {% if not (use_sunset_var | bool(false)) %}
+            false
+          {% else %}
+            {% set offset   = sunset_offset_var | int(0) %}
+            {% set next_set = state_attr('sun.sun', 'next_setting') | as_datetime | as_local %}
+            {% if states('sun.sun') == 'below_horizon' %}
+              {% set todays_sunset = next_set - timedelta(hours=24) %}
+              {{ now() >= todays_sunset + timedelta(minutes=offset) }}
+            {% elif offset < 0 %}
+              {{ now() >= next_set + timedelta(minutes=offset) }}
+            {% else %}
+              false
+            {% endif %}
+          {% endif %}
+
+      # Branch C: Sunrise start offset.
+      # When sun is below_horizon, next_rising is today's upcoming sunrise.
+      # Handles positive offsets (after sunrise) when sun is above_horizon.
+      - condition: template
+        alias: "Sunrise start offset"
+        value_template: >-
+          {% if not (use_sunrise_start_var | bool(false)) %}
+            false
+          {% else %}
+            {% set offset    = sunrise_start_offset_var | int(0) %}
+            {% set next_rise = state_attr('sun.sun', 'next_rising') | as_datetime | as_local %}
+            {% if states('sun.sun') == 'below_horizon' %}
+              {{ now() >= next_rise + timedelta(minutes=offset) }}
+            {% elif offset > 0 %}
+              {% set todays_rise = next_rise - timedelta(hours=24) %}
+              {{ now() >= todays_rise + timedelta(minutes=offset) }}
+            {% else %}
+              false
+            {% endif %}
+          {% endif %}
+
+
+mode: restart
+max_exceeded: silent
+
+
+actions:
+
+  # Save prior light state on first trigger only.
+  # On re-trigger (mode restart) active_boolean is already ON, skipping this.
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: !input active_boolean
+            state: "off"
+        sequence:
+          - action: scene.create
+            data:
+              scene_id: "{{ scene_id_var }}"
+              snapshot_entities:
+                - "{{ light_var }}"
+
+  - action: input_boolean.turn_on
+    target:
+      entity_id: !input active_boolean
+
+  - action: light.turn_on
+    target:
+      entity_id: !input light_entity
+    data:
+      brightness_pct: !input brightness_pct
+      transition: !input transition_on
+
+  # Hold for configured duration. Re-trigger restarts here, resetting the countdown.
+  - delay:
+      minutes: !input duration_minutes
+
+  - action: scene.turn_on
+    target:
+      entity_id: "scene.{{ scene_id_var }}"
+    data:
+      transition: !input transition_restore
+
+  - action: input_boolean.turn_off
+    target:
+      entity_id: !input active_boolean
