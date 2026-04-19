@@ -1,0 +1,50 @@
+type: custom:auto-entities
+card:
+  type: grid
+  columns: 2
+  square: false
+card_param: cards
+filter:
+  include:
+    - domain: sensor
+      attributes:
+        device_class: battery
+      options:
+        type: custom:mushroom-template-card
+        entity: this.entity_id
+        icon: |
+          {% set battery = states(config.entity) | float(0) %}
+          {% if battery >= 90 %}mdi:battery
+          {% elif battery >= 70 %}mdi:battery-high
+          {% elif battery >= 40 %}mdi:battery-medium
+          {% elif battery >= 20 %}mdi:battery-low
+          {% else %}mdi:battery-alert
+          {% endif %}
+        icon_color: |
+          {% set battery = states(config.entity) | float(0) %}
+          {% if battery >= 70 %}green
+          {% elif battery >= 40 %}amber
+          {% else %}red
+          {% endif %}
+        primary: "{{ state_attr(config.entity, 'friendly_name') | regex_replace('(?i)\\s*battery\\s*$', '') }}"
+        secondary: "🔋 {{ states(config.entity) | default('—') }}% | ⏱️ {{ relative_time(states[config.entity].last_changed) }}"
+        layout: horizontal
+        multiline_secondary: false
+        fill_container: false
+        tap_action:
+          action: more-info
+  exclude:
+    - entity_id: "*blind*"
+    - entity_id: "*ipad*"
+    - entity_id: "*phone*"
+    - entity_id: "*filter*"
+    - entity_id: "*solix*"
+    - entity_id: "*curtain*"
+    - entity_id: "*temp*"
+sort:
+  method: state
+  numeric: true
+  reverse: false
+  then:
+    method: name
+    reverse: false

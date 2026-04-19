@@ -1,0 +1,535 @@
+# ================================================================================
+# EVE MOTION BLINDS BATTERY PANEL - MUSHROOM TEMPLATE STYLE
+# 2-column layout with device name, battery %, and last update
+# Icon color: Green (≥70%) | Yellow (≥40%) | Red (<40%)
+# ================================================================================
+
+type: grid
+title: Eve Blind Batteries
+columns: 2
+square: false
+cards:
+  # backyard blind 1
+  - type: custom:mushroom-template-card
+    entity: sensor.backyard_blind_1_battery
+    icon: |
+      {% set battery = states('sensor.backyard_blind_1_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.backyard_blind_1_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Backyard Blind 1
+    secondary: 🔋 {{ states('sensor.backyard_blind_1_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.backyard_blind_1_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # backyard blind 2
+  - type: custom:mushroom-template-card
+    entity: sensor.backyard_blind_1_battery
+    icon: |
+      {% set battery = states('sensor.backyard_blind_2_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.backyard_blind_2_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Backyard Blind 2
+    secondary: 🔋 {{ states('sensor.backyard_blind_2_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.backyard_blind_2_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # backyard blind 3
+  - type: custom:mushroom-template-card
+    entity: sensor.backyard_blind_3_battery
+    icon: |
+      {% set battery = states('sensor.backyard_blind_3_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.backyard_blind_3_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Backyard Blind 3
+    secondary: 🔋 {{ states('sensor.backyard_blind_3_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.backyard_blind_3_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # backyard blind 4
+  - type: custom:mushroom-template-card
+    entity: sensor.backyard_blind_4_battery
+    icon: |
+      {% set battery = states('sensor.backyard_blind_2_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.backyard_blind_2_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Backyard Blind 4
+    secondary: 🔋 {{ states('sensor.backyard_blind_2_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.backyard_blind_2_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # backyard blind 5
+  - type: custom:mushroom-template-card
+    entity: sensor.backyard_blind_5_battery
+    icon: |
+      {% set battery = states('sensor.backyard_blind_2_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 50 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.backyard_blind_2_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 50 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Backyard Blind 5
+    secondary: 🔋 {{ states('sensor.backyard_blind_2_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.backyard_blind_2_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # backyard blind 6
+  - type: custom:mushroom-template-card
+    entity: sensor.backyard_blind_6_battery
+    icon: |
+      {% set battery = states('sensor.backyard_blind_2_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 60 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.backyard_blind_2_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 60 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Backyard Blind 6
+    secondary: 🔋 {{ states('sensor.backyard_blind_2_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.backyard_blind_2_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # backyard blind 7
+  - type: custom:mushroom-template-card
+    entity: sensor.backyard_blind_7_battery
+    icon: |
+      {% set battery = states('sensor.backyard_blind_2_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 70 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.backyard_blind_2_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 70 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Backyard Blind 7
+    secondary: 🔋 {{ states('sensor.backyard_blind_2_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.backyard_blind_2_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # backyard blind 8
+  - type: custom:mushroom-template-card
+    entity: sensor.backyard_blind_8_battery
+    icon: |
+      {% set battery = states('sensor.backyard_blind_2_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 80 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.backyard_blind_2_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 80 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Backyard Blind 8
+    secondary: 🔋 {{ states('sensor.backyard_blind_2_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.backyard_blind_2_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # Lounge Blind 1
+  - type: custom:mushroom-template-card
+    entity: sensor.lounge_blind_1_battery
+    icon: |
+      {% set battery = states('sensor.lounge_blind_1_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.lounge_blind_1_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Lounge Blind 1
+    secondary: 🔋 {{ states('sensor.lounge_blind_1_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.lounge_blind_1_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # Lounge Blind 2
+  - type: custom:mushroom-template-card
+    entity: sensor.lounge_blind_2_battery
+    icon: |
+      {% set battery = states('sensor.lounge_blind_2_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.lounge_blind_2_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Lounge Blind 2
+    secondary: 🔋 {{ states('sensor.lounge_blind_2_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.lounge_blind_2_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # Rose Room Blind 1
+  - type: custom:mushroom-template-card
+    entity: sensor.rose_room_blind_1_battery
+    icon: |
+      {% set battery = states('sensor.rose_room_blind_1_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.rose_room_blind_1_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Rose Room Blind 1
+    secondary: 🔋 {{ states('sensor.rose_room_blind_1_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.rose_room_blind_1_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # Rose Room Blind 2
+  - type: custom:mushroom-template-card
+    entity: sensor.rose_room_blind_2_battery
+    icon: |
+      {% set battery = states('sensor.rose_room_blind_2_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.rose_room_blind_2_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Rose Room Blind 2
+    secondary: 🔋 {{ states('sensor.rose_room_blind_2_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.rose_room_blind_2_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # Cello Room Blind 1
+  - type: custom:mushroom-template-card
+    entity: sensor.cello_room_blind_1_battery
+    icon: |
+      {% set battery = states('sensor.cello_room_blind_1_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.cello_room_blind_1_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Cello Room Blind 1
+    secondary: 🔋 {{ states('sensor.cello_room_blind_1_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.cello_room_blind_1_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # Cello Room Blind 2
+  - type: custom:mushroom-template-card
+    entity: sensor.cello_room_blind_2_battery
+    icon: |
+      {% set battery = states('sensor.cello_room_blind_2_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.cello_room_blind_2_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Cello Room Blind 2
+    secondary: 🔋 {{ states('sensor.cello_room_blind_2_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.cello_room_blind_2_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # 2nd Floor Blind 1
+  - type: custom:mushroom-template-card
+    entity: sensor.second_floor_blind_1_battery
+    icon: |
+      {% set battery = states('sensor.second_floor_blind_1_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.second_floor_blind_1_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: 2nd Floor Blind 1
+    secondary: 🔋 {{ states('sensor.second_floor_blind_1_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.second_floor_blind_1_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # 2nd Floor Blind 2
+  - type: custom:mushroom-template-card
+    entity: sensor.second_floor_blind_2_battery
+    icon: |
+      {% set battery = states('sensor.second_floor_blind_2_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.second_floor_blind_2_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: 2nd Floor Blind 2
+    secondary: 🔋 {{ states('sensor.second_floor_blind_2_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.second_floor_blind_2_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # Piano room Blind 1
+  - type: custom:mushroom-template-card
+    entity: sensor.piano_room_blind_1_battery
+    icon: |
+      {% set battery = states('sensor.piano_room_blind_1_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.piano_room_blind_1_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Piano Room Blind 2
+    secondary: 🔋 {{ states('sensor.piano_room_blind_1_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.piano_room_blind_1_batterylast_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # Piano room Blind 2
+  - type: custom:mushroom-template-card
+    entity: sensor.piano_room_blind_2_battery
+    icon: |
+      {% set battery = states('sensor.piano_room_blind_2_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.piano_room_blind_2_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Piano Room Blind 2
+    secondary: 🔋 {{ states('sensor.piano_room_blind_2_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.piano_room_blind_2_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+
+  # Piano room Blind 3
+  - type: custom:mushroom-template-card
+    entity: sensor.piano_room_blind_3_battery
+    icon: |
+      {% set battery = states('sensor.piano_room_blind_3_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.piano_room_blind_3_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Piano Room Blind 3
+    secondary: 🔋 {{ states('sensor.piano_room_blind_3_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.piano_room_blind_3_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+      
+  # Piano room Curtain 1
+  - type: custom:mushroom-template-card
+    entity: sensor.piano_room_curtain_1_battery
+    icon: |
+      {% set battery = states('sensor.piano_room_curtain_1_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.piano_room_curtain_1_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Piano Room Curtain 1
+    secondary: 🔋 {{ states('sensor.piano_room_curtain_1_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.piano_room_curtain_1_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
+      
+  # Piano room Curtain 2
+  - type: custom:mushroom-template-card
+    entity: sensor.piano_room_curtain_2_battery
+    icon: |
+      {% set battery = states('sensor.piano_room_curtain_2_battery') | float(0) %}
+      {% if battery >= 90 %}mdi:battery
+      {% elif battery >= 70 %}mdi:battery-high
+      {% elif battery >= 40 %}mdi:battery-medium
+      {% elif battery >= 20 %}mdi:battery-low
+      {% else %}mdi:battery-alert
+      {% endif %}
+    icon_color: |
+      {% set battery = states('sensor.piano_room_curtain_2_battery') | float(0) %}
+      {% if battery >= 70 %}green
+      {% elif battery >= 40 %}amber
+      {% else %}red
+      {% endif %}
+    primary: Piano Room Curtain 2
+    secondary: 🔋 {{ states('sensor.piano_room_curtain_2_battery') | default('—') }}% | ⏱️ {{ relative_time(states.sensor.piano_room_curtain_2_battery.last_changed) }}
+    layout: horizontal
+    multiline_secondary: false
+    fill_container: false
+    tap_action:
+      action: more-info
