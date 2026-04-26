@@ -99,7 +99,7 @@ button:
     icon: mdi:thermometer-plus
     on_press:
       - lambda: |-
-          id(dac_value) = 1334.0;
+          id(dac_value) = 1365.0;
           id(press_button).press();
 
   - platform: template
@@ -107,7 +107,7 @@ button:
     icon: mdi:thermometer-minus
     on_press:
       - lambda: |-
-          id(dac_value) = 1061.0;
+          id(dac_value) = 1080.0;
           id(press_button).press();
 
   - platform: template
@@ -115,7 +115,7 @@ button:
     icon: mdi:air-conditioner
     on_press:
       - lambda: |-
-          id(dac_value) = 943.0;
+          id(dac_value) = 1599.0;
           id(press_button).press();
 
   - platform: template
@@ -123,7 +123,7 @@ button:
     icon: mdi:fan
     on_press:
       - lambda: |-
-          id(dac_value) = 1566.0;
+          id(dac_value) = 1009.0;
           id(press_button).press();
 
   - platform: template
@@ -131,7 +131,7 @@ button:
     icon: mdi:timer-plus-outline
     on_press:
       - lambda: |-
-          id(dac_value) = 1264.0;
+          id(dac_value) = 1289.0;
           id(press_button).press();
 
   - platform: template
@@ -139,7 +139,7 @@ button:
     icon: mdi:arrow-down-bold
     on_press:
       - lambda: |-
-          id(dac_value) = 1128.0;
+          id(dac_value) = 1150.0;
           id(press_button).press();
 
 
@@ -165,11 +165,11 @@ switch:
     icon: mdi:home-floor-2
     turn_on_action:
       - lambda: |-
-          id(dac_value) = 922.0;
+          id(dac_value) = 935.0;
           id(press_button).press();
     turn_off_action:
       - lambda: |-
-          id(dac_value) = 922.0;
+          id(dac_value) = 935.0;
           id(press_button).press();
     lambda: return id(upstairs).state;
 
@@ -179,11 +179,11 @@ switch:
     icon: mdi:kitchen
     turn_on_action:
       - lambda: |-
-          id(dac_value) = 781.0;
+          id(dac_value) = 788.0;
           id(press_button).press();
     turn_off_action:
       - lambda: |-
-          id(dac_value) = 781.0;
+          id(dac_value) = 788.0;
           id(press_button).press();
     lambda: return id(kitchen).state;
 
@@ -193,11 +193,11 @@ switch:
     icon: mdi:sofa-outline
     turn_on_action:
       - lambda: |-
-          id(dac_value) = 863.0;
+          id(dac_value) = 867.0;
           id(press_button).press();
     turn_off_action:
       - lambda: |-
-          id(dac_value) = 863.0;
+          id(dac_value) = 867.0;
           id(press_button).press();
     lambda: return id(living_room).state;
 
@@ -319,7 +319,7 @@ binary_sensor:
 #First argument of KeypadStatus is the pin number of the ADC input
 custom_component:
   - lambda: |-
-      auto keypad_status = new KeypadStatus(33,
+      auto keypad_status = new KeypadStatus(32,
                                             id(bit_string), id(setpoint_temp), id(bit_count),  
                                             id(cool), id(auto_md), id(room5), id(run), 
                                             id(room8), id(room7), id(room6), id(timer), 

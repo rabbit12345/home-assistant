@@ -9,9 +9,13 @@ homeassistant:
   customize:
     sensor.house_power_consumption:
       state_class: total_increasing
-      
+  latitude: -33.880218505859375
+  longitude: 151.07440370422248
+
 frontend:
   themes: !include_dir_merge_named themes
+
+battery_notes:
 
 satel_integra:
   host: 10.0.1.121
@@ -62,6 +66,7 @@ group: !include groups.yaml
 automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
+notify: !include notify.yaml
 
 fibaro:
   gateways:
@@ -211,78 +216,162 @@ sensor:
       - group
       - moving
       - slidePosition
-      
-cover:
-  - platform: template
-    covers:
-      study_blind_1:
-        friendly_name: "Study Blind 1"
-        unique_id: study_blind_1_id
-        open_cover:
-          service: remote.send_command
-          target:
-            entity_id: remote.rm3_pro
-          data:
-            command: b64:sgGEAw0JDQgOCA0JDQkNCA4IDggNCQ0IDggOCA0IDggOCA0JDQkNCA4IDggOCA0IDggOCA0JDQgOCA4IDQgOCA4IDQkNCA4IDggNCA4JDQgOCA4IDQgOCA4IDggNCA4IDggNCQ0IDggNCQ0JDQgOCA4IDQkNCA4IDggNCQ0IDggOCA0IDggOCA4IDgcOCA4IDggNCA4IDggNCQ0IDggOCA0JDQkNCA4IDggNCQ0IDggOCA0JDQgOCA4IDQgOCA4IDggNCQ0IDggOCA0JDQgOCA4IDQgOCA4IDggOCA0IDggOCA0JDQgOCA4IDQkNCA4IDggNCQ0IDggOCA0JDQkNCA4IDggNCA4IDggNCQ0IDggOCA4IDQkNCA4IDggNCQ0IDggOCA0IDggOCA4IDQkNCA4IDggNCQ0JDQgOCA0IDggOCA0JDQkNCQ0IDggOCA0IDggOCA0JDQgOCA4IDQgNCQ0JDAoMCQ0JDAoMCgwJDAoMCQ0JDAoMCgwJDQkMCgwJDQkMCgwKDAkMCgwKDAkOCA4IDQkNCA4IDggNCA4IDggNCQ0JDQkNCA4IDgcOCA4IDggOCA0IDggOCA0JDQkNCA4IDggNCQ0IDggOCA0JDQgOCA4IDQgOCA4JDQgNCQ0JDQgOCA4IDQkNCA4IDggOCA0JDQgOCA0JDQkNCA4IDggNCQ0IDggOCA0JDQgOCA4IDggNCA4IDggOCA0IDggOCA4IDQkNCQ0IDQkNCQ0IDggOCA4IDQgOCA4IDQkNCQ0IDggNCQ0JDQgOCA4IDQkNCQ0IDggNCQ0JDQgOCA4IDQgOCA4IDggNCA4JDQgNCQ4IDQgOCA4IDRQWFRYWFhUWFRcVFhUWFhUWFhUWFRYVWVYWFBcVFisWFRYVFxUsFRYVFxUWKi0qLCsWFRYVLCssFRcVFioXFSwqFxUWFRYVFxUWFRYWLCoWFSwrLCsWFRYWFhUWFRYVFxUWFRYVFxUWFRcUFxQXFRYVWVUWFRYVFyoWFRcVFhUsFhYVFhUWKywrLCoXFRYVLCotFRYWFioWFSwrFhUWFRcVFhUXFRYVLCoXFSwrLCoXFRYVFhUXFRYVFhYWFRYVFxUWFRYVFhUWFhYVWVUWFRYWFioWFRcVFhUsFRcVFhUWKywrLCoXFRUWLCssFhUVFyoWFSwrFhUWFhYVFhUXFRYVLCsWFSwrLCsWFRYVFgAF3AAAAAA=
-        close_cover:
-          service: remote.send_command
-          target:
-            entity_id: remote.rm3_pro
-          data:
-            command: >- 
-              b64:sgGEAw4IDQkNCQ0IDggOCA4HDggOCA4IDQkNCA4IDQkNCQ0IDggNCQ0JDQgOCA4IDQkNCA4IDggNCA4IDggNCA4IDggOCA4IDQgOCA4IDQgOCA4IDggOCA0IDggOCA0IDggOCA0IDgkNCA4IDggNCA4IDggNCQ0IDggOCA0JDQkNCA4IDQkNCA4IDggOCA0IDggOCA4HDggOCA4IDQkNCQ0IDggOCA0IDggOCA0IDggOCA4IDQkNCA4IDggOCA0IDggOCA0JDQgOCA4IDQgOCA4IDggNCQ0IDggOCA0IDggOCA0JDQgOCA4IDQkNCQ0IDggOBw4IDggOCA0JDQgOCA4IDQgOCA4IDggOCA0IDggNCQ0JDQgOCA4IDQkNCQ0IDggNCQ0JDQgOCA4HDggOCA4IDQgOCA4IDggNCQ0JDQgOCA0JDQgOCA4IDQgOCA4IDggOCA0IDggOCA0IDggOCA4IDQkNCA4IDhMWFRcVFhUWFhUWFhUXFBcUFxUWFRYVWVYVFhYVFioWFhYVFhUtFBcVFhUXKiwrLCoWFRcVLCotFRYVFisWFSwVFyoWFRYVFxUWFRYVLRUWKi0qLCsWFRYVFxUWFRYVFhUXFRYVFhUXFRYVFhUWFhYVWFYWFRYVFisWFRYVFhUtFRYVFxQXKiwrLCoXFRYVLCssFRcVFioWFSwVFyoXFBcVFhUXFBcVLBUXKS0qLSoWFRcVFhUWFRcVFhUWFRYVFxUWFRYVFxUWFRYVWVUXFBYVFyoWFRYWFhUsFRcVFhUWKi0qLCsWFRYVLSosFRcVFioXFC0VFioXFRYVFhUXFRYVLBYWKiwrLCsWFRYVFhUWFhYVFhUXFBcVFhUXFBcVFhUWFRcUWVYWFRYVFyoWFRcUFxQtFRcUFxUWKi0qLCsWFRYVLSosFRcVFisVFiwVFisWFRYVFhUXFRYVLBUXKi0qLCsWFRYVFxQXFRYVFhYWFRYVFhYWFRYVFhUXFRYVWVUWFRcVFioXFBcVFhUsFRcVFhUWKywqLSoWFRcVLCotFRYVFyoWFSwVFisWFRcVFhUWFRcVLBUWKywrLCoWFhUWFhUWFRcUFxUWFRcUFxUWFhYUFxUWFRYVWVYWFRYVFioXFRYVFxUsFRcUFxUWKiwrLCsWFRYVLSosFhYVFisWFSwVFisWFRYWFhUWFRYVLRUWKi0qLCsXFRUVFwAF3AAAAAA=
-        stop_cover:
-          service: remote.send_command
-          target:
-            entity_id: remote.rm3_pro
-          data:
-            command: >- 
-              b64:sgGEAw0IDggOCA4HDggOCA0IDggOCA4IDggNCA4IDQkNCQ0IDggOCA0JDQkNCA4IDgcOCA4IDgcOCA4IDggOCA4HDggOCA4IDQgOCA4IDQkOCA0IDggOCA0IDggOCA4IDQgOCA4IDQkNCA4IDggOCA0IDggOCA4IDQgOCA4IDQkNCA4IDggNCA4IDggNCQ0JDQgOCA4IDQkNCA4IDggOCAwJDAoMCQ0JDAoMCgwJDQkMCgwJDQkMCgwJDAoMCgwKDAkMCgwKDAkMCgwJDQkOCA4IDQkNCA4IDQkNCA4IDggOCA0JDQgOCA4IDggNCA4IDggNCQ0IDggOCA4IDQgOCA4IDQgOCA4IDggOBw4IDggOCA0JDQgOCA4IDggNCA4IDggOCA0JDQgOCA4IDgcOCA4IDggOBw4IDggOCA0IDggOCA4IDQgOCA4IDggNCA4IDggOCA4IDQgOCA4IDQkNCQ0IDggNCQ0IDggOCA0JDQgOCA4IDgcOCA4IDggNCQ0JDQgOCA4IDQkNCA4IDQkNCQ0IDggOCA4IDQgOCA4IDQgPBw4IDggNCQ0JDQgOCA4IDQgOCA4IDggNCA4IDggOCA0JDQkNCA4IDggNCA4IDggOBw4JDQgOCA0JDQgOCA0JDQkNCQ0IDQkOCA0IDggOCA0JDQkNCA4IDQkOBw4IDggNCQ0IDggOCA4IDQgOCA4IDggNCQ0IDggOCA4IDQgOCQ0IDQkNCA4IDggNCQ0JDQgOCA4IDQkNCA4IDggNCQ0IDggOCA0JDQgOCA0JDQkNCQ0IDggNCQ0IDggOCA4IDQgOCA4IDQgOCA4IDggOCA0IDggOCA4IDhMWFRYVFxUWFRYWFhUWFRcUFxUWFRYVWVYWFBcVFioXFRYVFhUtFRYVFhUXKiwrLCsWFRYVLCssFRYVFyoWFRcVLCoXFRYVFhUXFBcVFhUtKiwrLCsWFRYVFhUWFRcVFhUXFRYVFhUXFRYVFhUWFhYVWVUWFRYVFyoWFRYVFxUsFRcUFxUWKywqLCsWFRYVLSosFhYVFisWFRYVLSoWFRYVFxUWFRYVFxUsKi0qLSoWFRcUFxUWFRcUFxUWFRYWFhUWFRcUFxUWFRYVWVYWFRYVFisWFRYVFxUsFRcUFxUWKi0qLCsWFRcULSosFhYVFisWFRYVLSoWFRcVFhUWFRcVFhQtKywqLSoWFRcVFgAF3AAAAAA=
-            
-      study_blind_2:
-        friendly_name: "Study Blind 2"
-        unique_id: study_blind_2_id
-        open_cover:
-          service: remote.send_command
-          target:
-            entity_id: remote.rm3_pro
-          data:
-            command: b64:sgGEAw0IDggOCA4IDQgOCA4IDggNCA4IDggNCQ0JDQkNCA4IDQkNCA4IDggOBw4IDggOCA0JDQgOCA4IDggNCA4IDggNCQ0IDggOCA0JDggNCA4IDggNCA4IDggNCQ0IDggOCA4IDQkNCA4IDggNCQ0IDggOCA4HDggOCA4IDQgOCA4IDggOCA0IDggOCA0JDQgOCA4IDggNCQ0IDggNCQ0IDggOCA4IDQkNCA4IDggOCA0IDggOCA4IDQgOCA4IDggNCA4IDggOCA0JDQgOCA4IDQgOCA4IDggOCA0IDggOCA4HDggOCA4IDggNCA4JDQgOCA0IDggOCA0JDQkNCA4IDggOCA0JDQgOCA4IDgcOCA4IDggNCQ0IDggOCA4IDQgOCA4IDQkNCQ0IDggNCQ4IDQgOCA4IDQgOCA4IDggOBw4IDggOCA0JDgcOCA4IDggNCQ0IDggOCA0IDggOCA4IDQkNCA4IDggOCA0IDggOCA4IDQkNCA4IDggNCQ0JDQgOCA4IDQgOCA4IDggNCQ0IDggNCQ0JDQgOCA4IDggNCA4IDggOCA4HDggOCA4IDQkNCA4IDQkNCQ0IDggOCA0JDQkNCA4IDggOBw4IDggOCA0IDggNCQwKDAoMCQwKDAoMCQwKDAoMCgwJDAoMCgwJDQkMCgwJDQkMCgwKDAkNCQwKDgcOCA4IDQgOCA4IDggOBw4IDggOCA4IDQkNCA4IDggOCA4HDggOCA4IDgcOCA4IDggNCQ0JDQgOCA4IDQkNCA4IDggNCQ0IDggOCA4IDQgOCA4IDggNCQ0JDQgOCA4IDgcOCA4IDggNCA4IDggOCA0JDggNCA4IDhMXFBcVFhUXFRYVFhUXFRYVFhUWFhYVWVYVKhcVLCsWFRYVLRUWFRYWFiosKywrFhUWFSwrLBUXFRYrFhUsKxYUFxUWFRcVFhUXFBcVLCssKywqFxUVFhYVFhUXFRYVFxUWFRYVFxUWFRYVFxQXFVlVFisWFC0qFxUWFS0VFhUWFRcqLCssKxYVFhUsKywVFxUWKxYVLCoXFRYVFxUWFRYWFRYWFSwrLCssKxYVFhUWFRcVFhUWFRcVFhUXFRYVFhUXFBcVFhVZVhYqFhUtKhcVFhUsFRYWFhUWKywrLCoXFRYVLCssFRYVFyoXFSwqFxUWFRYVFxUWFRcUFxUsKywqLCsWFRYVFwAF3AAAAAA=
-        close_cover:
-          service: remote.send_command
-          target:
-            entity_id: remote.rm3_pro
-          data:
-            command: >- 
-              b64:sgGEAw4IDggNCQ0JDQgNCQ0JDQgNCQ0JDQgNCQ0JDQgOCA0JDQkNCA4IDQgOCA4IDQkNCQ0IDQkNCA4IDggNCQ0IDggNCQ0JDQgOCA0JDQgOCA0JDQkNCA0JDQgOCA4IDQkNCQwJDQkNCA4IDggNCQ0IDggNCQ0JDQgOCA0JDQgNCQ0JDQgOCA0JDQgOCA4IDQkNCA4IDQkNCQ0IDQkNCA4IDggNCQ0JDQgNCQ0IDggOCA0JDQgOCA4IDQgOCA4IDggNCA4IDQkNCA4IDggNCQ0IDggNCQ0IDggNCQ0JDQgOCA4IDQgOCA4IDQkNCA4IDggNCQ0IDQkNCQ0IDQkNCQ0IDggOCA0JDQgOCA0JDQgOCA0JDQgOCA4IDQkNCQwJDQkNCQ0IDQkNCQ0IDggNCQ0JDQgOCA0IDggOCA0JDQgOCA4IDQkNCA4IDggNCQ0IDggNCQ0IDggNCQ0IDggNCQ0JDQgOCA4IDQkNCA4IDggNCA4IDggNCA4IDggNCQ0IDggNCQ0JDQgOCA4IDQgOCA4IDQkNCA4IDQkNCQ0IDggNCQ0IDggNCQ0IDggOCA0JDQgOCA0JDQkNCQwJDQkNCA4IDggNCQ0IDggOCA0IDggOCA0JDQkNCA0JDQkNCA4IDQkNCA4IDQkNCQ0JDAkNCQ0IDggNCQ0JDQgOCA4IDQkNCA4IDQkNCA4IDggNCA4IDggNCQ0JDQgNCQ0JDRQWFRYVFhYWFRYVFhUWFhYVFhUWFRYVWVUWKhcVLCoXFRYVLBUWFRYVFyosKywqFhYVFiwrKxYWFRYrFRYsFRYrFhUWFRYVFhUXFRYVFhUsFRYrLCsWFRYVFhUWFRcVFhUWFRYWFhUWFRYVFhUWFhYVWFYWKhYVLCsWFRYVLBYWFRYVFisrKywrFhUWFSwrLBUWFRYrFhUsFRYrFhUWFRcVFhUWFRYVFxUsFRYrLCoWFRYVFhYWFRYVFhYWFRYVFhUWFhYVFhUWFRYWWFYVKxUWKysXFRYVLBUWFRYVFyosKywrFRYWFSwrLBUWFRYrFhUsFRYrFhUWFRYWFhUWFRYVFhUsFhYqLCsWFRYVFhUWFhYVFhUXFRYVFhUWFhUVFxUWFRYWV1YWKxUWLCsVFRcVLBUWFRYWFiosKywrFRYWFSsrLBYWFRYrFhUsFRYrFhUWFRYVFhYWFRYVFhUsFhYqLCsWFRYVFgAF3AAAAAA=
-        stop_cover:
-          service: remote.send_command
-          target:
-            entity_id: remote.rm3_pro
-          data:
-            command: >- 
-              b64:sgGEAw0IDggOCA0IDggOCA4IDgcOCA4IDggNCA4IDQkOCA0IDggOCA4IDQgOCA4IDQgOCA4IDQgOCA4IDggOBw4IDggNCQ0JDQgOCA4HDggOCA4IDQkNCA4IDggNCA4IDggOCA0JDQgOCA0JDggNCA4IDQkNCA4IDggNCA4IDggOCA4HDggOCA4IDQgOCA4IDggNCQ0IDggOCA0IDggOCA4IDQgOCA4IDQkNCA4IDggNCA4IDggOCA0JDQgOCA4IDQgOCA4IDQkNCA4IDggOCA0IDggNCQ0JDQgOCA4IDggNCA0JDAoMCQ0JDQkMCQ0JDAoMCQwKDQkMCgwJDQkMCQ0JDAoMCQ0JDAoMCgwJDQkPBw0IDggOCA4HDggOCA4IDQgOCA4IDggOCA0IDggOCA0JDQgOCA4IDggOBw4IDggOBw4IDggOCA4IDQgOCA4IDggOCA0IDggOCA0JDQgOCA4IDQgOCA4IDgcOCA4IDggOCA0IDggOCA4IDQgOCA4IDggNCA4IDggOCA4HDwcOCA4IDgcOCA4IDggOCA0IDggOCA4IDQgOCA4IDggNCA4IDggOBw4IDggOCA0IDggOCA4IDgcOCA4IDggNCQ0IDggOCA0JDQkNCA4IDggNCA4IDggOCA0IDggOCA0IDwgNCA4IDggNCA4IDggOCA0JDQgOCA4IDQgOCA4IDggNCA4IDggOCA0IDggOCA4IDQkNCA4IDggNCQ0IDggOCA0JDQgOCA4IDQgOCA4IDggOBw4IDggNCQ0JDQkNCA4IDgcOCA4IDggNCQ0IDggOCA0IDggOCA4IDQgOCA4IDQkNCQ0IDggOCA0JDQgOCA4IDRQWFRcVFhUWFRcVFhUWFRcUFxUWFRYVWVUXKhYVLCsWFRYVLRUWFRYVFissKi0qFxUWFC0rLBUWFRcqFhUWFS0qFxUWFRYVFxQXFSwVFissKywqFxQXFRYVFhUXFRYVFhUXFRYVFhUXFBcVFhUXFFlWFioWFSwrFhUXFSwVFhUWFRcqLSosKxYVFhUsKywVFxQXKhYWFhUsKhcVFhUXFBcVFhUsFRcqLCssKhcVFhUWFRcVFhUXFBcVFhUWFRcVFhUWFRcUFxVZVRYrFhQtKhcVFhUtFRYVFhUXKiwqLSoXFRYVLCotFRcUFyoWFRYVLSoXFBcVFhUXFRYVLBUXKiwrLCoXFRYVFgAF3AAAAAA=
 
+  - platform: rest
+    scan_interval: 10
+    username: !secret fibaro_user
+    password: !secret fibaro_password
+    authentication: basic
+    resource: "http://10.0.1.115/api/globalVariables/sendPushover"
+    name: fibaro_pushover_state
+    value_template: '{{ value_json.value }}'
+
+cover:
   - platform: cover_rf_time_based
     devices:
-      study_blind_1_tb:
-        name: "Study blind 1 TB"
-        travelling_time_up: 36
-        travelling_time_down: 34
-        cover_entity_id: cover.study_blind_1
+      study_blind_1:
+        name: "Study Blind 1"
+        travelling_time_up: 43
+        travelling_time_down: 33
+        close_script_entity_id: script.study_blind1_down
+        stop_script_entity_id: script.study_blind1_stop
+        open_script_entity_id: script.study_blind1_up
         send_stop_at_ends: True #optional
         always_confident: True #optional
         device_class: curtain #optional
         
-      study_blind_2_tb:
-        name: "Study blind 2 TB"
-        travelling_time_up: 36
-        travelling_time_down: 34
-        cover_entity_id: cover.study_blind_2
+      study_blind_2:
+        name: "Study Blind 2"
+        travelling_time_up: 45
+        travelling_time_down: 33
+        close_script_entity_id: script.study_blind2_down
+        stop_script_entity_id: script.study_blind2_stop
+        open_script_entity_id: script.study_blind2_up
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+
+      lounge_blind_1:
+        name: "Lounge Blind 1"
+        travelling_time_up: 41
+        travelling_time_down: 31
+        close_script_entity_id: script.lounge_blind1_down
+        stop_script_entity_id: script.lounge_blind1_stop
+        open_script_entity_id: script.lounge_blind1_up
         send_stop_at_ends: True #optional
         always_confident: True #optional
         device_class: curtain #optional
         
+      lounge_blind_2:
+        name: "Lounge Blind 2"
+        travelling_time_up: 41
+        travelling_time_down: 31
+        close_script_entity_id: script.lounge_blind2_down
+        stop_script_entity_id: script.lounge_blind2_stop
+        open_script_entity_id: script.lounge_blind2_up
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+
+      rose_room_blind_1:
+        name: "Rose Room Blind 1"
+        travelling_time_up: 30
+        travelling_time_down: 28
+        close_script_entity_id: script.rose_room_blind1_down
+        stop_script_entity_id: script.rose_room_blind1_stop
+        open_script_entity_id: script.rose_room_blind1_up
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+        
+      rose_room_blind_2:
+        name: "Rose Room Blind 2"
+        travelling_time_up: 80
+        travelling_time_down: 80
+        close_script_entity_id: script.rose_room_blind2_down
+        stop_script_entity_id: script.rose_room_blind2_stop
+        open_script_entity_id: script.rose_room_blind2_up
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+
+      cello_room_blind_1:
+        name: "Cello Room Blind 1"
+        travelling_time_up: 37
+        travelling_time_down: 32
+        close_script_entity_id: script.cello_room_blind1_down
+        stop_script_entity_id: script.cello_room_blind1_stop
+        open_script_entity_id: script.cello_room_blind1_up
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+        
+      cello_room_blind_2:
+        name: "Cello Room Blind 2"
+        travelling_time_up: 41
+        travelling_time_down: 30
+        close_script_entity_id: script.cello_room_blind2_down
+        stop_script_entity_id: script.cello_room_blind2_stop
+        open_script_entity_id: script.cello_room_blind2_up
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+
+      master_room_blind_1:
+        name: "Master Room Blind 1"
+        travelling_time_up: 32
+        travelling_time_down: 29
+        close_script_entity_id: script.master_room_blind1_down
+        stop_script_entity_id: script.master_room_blind1_stop
+        open_script_entity_id: script.master_room_blind1_up
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+        
+      master_room_blind_2:
+        name: "Master Room Blind 2"
+        travelling_time_up: 31
+        travelling_time_down: 28
+        close_script_entity_id: script.master_room_blind2_down
+        stop_script_entity_id: script.master_room_blind2_stop
+        open_script_entity_id: script.master_room_blind2_up
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+
+      2nd_floor_blind_1:
+        name: "2nd Floor Blind 1"
+        travelling_time_up: 37
+        travelling_time_down: 32
+        close_script_entity_id: script.2nd_floor_blind1_down
+        stop_script_entity_id: script.2nd_floor_blind1_stop
+        open_script_entity_id: script.2nd_floor_blind1_up
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+        
+      2nd_floor_blind_2:
+        name: "2nd Floor Blind 2"
+        travelling_time_up: 41
+        travelling_time_down: 30
+        close_script_entity_id: script.2nd_floor_blind2_down
+        stop_script_entity_id: script.2nd_floor_blind2_stop
+        open_script_entity_id: script.2nd_floor_blind2_up
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+
+      isabelle_room_blind:
+        name: "Isabelle Room Blind"
+        travelling_time_up: 22
+        travelling_time_down: 18
+        close_script_entity_id: script.isabelle_room_blind_down
+        stop_script_entity_id: script.isabelle_room_blind_stop
+        open_script_entity_id: script.isabelle_room_blind_up
+        send_stop_at_ends: True #optional
+        always_confident: True #optional
+        device_class: curtain #optional
+
   - platform: template
     covers:
       pianoroom_curtains:
@@ -329,10 +418,68 @@ rest_command:
       Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxNzIwMzM2MTczLCJpYXQiOjE2ODg4MDAxNzMsImp0aSI6IjIwNWZiNWIwLTJkZjEtNDg1YS04MjM3LTQ2Nzk3MmQ0ZGFmZCIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.WXXT7bDEO3ch7x6vLap8gV2rQMl_5SgBAIVuq6mbCZgDy1nIdXZffhCEAIKsw_ZYI1FIr4NI1_JJrewYM9BexQ
     verify_ssl: false
 
+  set_fibaro_var:
+    method: put
+    url: "http://10.0.1.115/api/globalVariables/{{ var }}"
+    username: !secret fibaro_user
+    password: !secret fibaro_password
+    payload: '{"value":"{{ value }}"}'
+    headers:
+      Content-Type: application/json
+
+  fibaro_virtualdevice_pushover_state_send:    
+    method: GET
+    url: "http://10.0.1.115/api/callAction?deviceID=2082&name=pressButton&arg1=1"
+    username: !secret fibaro_user
+    password: !secret fibaro_password
+    headers:
+      Content-Type: "application/json"
+    #payload: '{"deviceID":2082, "name":"pressButton", "args":[1]}'
+
+  fibaro_virtualdevice_pushover_state_stop:
+    method: GET   
+    url: "http://10.0.1.115/api/callAction?deviceID=2082&name=pressButton&arg1=2"
+    username: !secret fibaro_user
+    password: !secret fibaro_password
+    headers:
+      Content-Type: "application/json"
+
+
+  fibaro_studylight_off:
+    method: GET   
+    url: "http://10.0.1.115/api/callAction?deviceID=340&name=turnOff"
+    username: !secret fibaro_user
+    password: !secret fibaro_password
+    payload: '{}'
+    headers:
+      Content-Type: application/json
+
+  fibaro_studylight_on:
+    method: GET   
+    url: "http://10.0.1.115/api/callAction?deviceID=340&name=turnOn"
+    username: !secret fibaro_user
+    password: !secret fibaro_password
+    payload: '{}'
+    headers:
+      Content-Type: application/json
+
 input_boolean:
   auto_dyson_heater:
     name: auto dyson heater
-    
+
+  auto_actron_ac:
+    name: auto actron AC
+
+  fibaro_pushover:
+    name: fibaro_pushover
+ 
+switch:
+  - platform: command_line
+    switches:
+      fibaro_studylight:
+        command_on: "curl -X POST -u jay@powerun.com:753951Qqq -d http://10.0.1.115/api/callAction?deviceID=340&name=turnOn"
+        command_off: "curl -X POST -u jay@powerun.com:753951Qqq -d http://10.0.1.115/api/callAction?deviceID=340&name=turnOff"
+           
 logger:
   default: info
   logs:

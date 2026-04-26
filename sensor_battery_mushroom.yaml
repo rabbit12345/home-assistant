@@ -34,6 +34,7 @@ filter:
         tap_action:
           action: more-info
   exclude:
+    - name: "Battery*"
     - entity_id: "*blind*"
     - entity_id: "*ipad*"
     - entity_id: "*phone*"
@@ -41,6 +42,7 @@ filter:
     - entity_id: "*solix*"
     - entity_id: "*curtain*"
     - entity_id: "*temp*"
+    - name: "/battery.+$/i"
 sort:
   method: state
   numeric: true
