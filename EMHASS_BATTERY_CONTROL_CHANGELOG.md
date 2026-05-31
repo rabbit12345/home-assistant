@@ -11,6 +11,18 @@ All notable changes to `EMHASS battery control script.yaml`.
   every run, including the planned battery power in kW, and runs **even when
   control is disabled** (shows `— CONTROL DISABLED`).
 - Single `planned_mode` variable so the display and control logic always agree.
+- **Future-plan visualisation** derived from the EMHASS forecast attributes:
+  - Template sensor `sensor.emhass_next_mode_change` (file
+    `template/emhass_future_plan_template.yaml`) exposing next mode, `starts_at`,
+    `duration_min`, `current_mode`.
+  - Markdown dashboard card (`emhass_future_plan_card.yaml`) rendering the
+    upcoming schedule as collapsed mode blocks with peak kW, signed grid `Total $`,
+    and the energy-weighted effective unit price embedded in the mode label
+    (`charge - 0.089`).
+  - Reads `sensor.mpc_batt_power` attr `battery_scheduled_power`,
+    `sensor.mpc_grid_power` attr `forecasts`, `sensor.mpc_general_price` attr
+    `unit_load_cost_forecasts`, `sensor.mpc_feed_in_price` attr
+    `unit_prod_price_forecasts` — all 5-minute, index-aligned.
 
 ### Changed
 - **Migrated control from Sigen plant entities to the Amber Bridge** override

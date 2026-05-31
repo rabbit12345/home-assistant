@@ -1,4 +1,3 @@
-
 # Configure a default setup of Home Assistant (frontend, api, etc)
 default_config:
 
@@ -15,37 +14,12 @@ homeassistant:
 frontend:
   themes: !include_dir_merge_named themes
 
-battery_notes:
-
-satel_integra:
-  host: 10.0.1.121
-  port: 7091
-  code: 1177
-  partitions:
-    01:
-      name: "House"
-      arm_home_mode: 1
-    02:
-      name: "Fibaro"
-  zones:
-    01:
-      name: "lounge"
-      type: "motion"
-    02:
-      name: "study"
-      type: "motion"
-    03:
-      name: "upstairs"
-      type: "motion"
-    04:
-      name: "kitchen"
-      type: "motion"
-      
 person:
   - name: lillian
     id: lillian_id
     device_trackers:
       - device_tracker.lillian_iphone13promax
+
 http:
   #server_port: 58123
   #ssl_certificate: /etc/letsencrypt/live/hass.example.com/fullchain.pem
@@ -67,13 +41,51 @@ automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
 notify: !include notify.yaml
+mqtt: 
+  - !include anker_mqtt_fallback_sources.yaml
+template: !include_dir_merge_list template/
+ 
+  
+sql:
+  - name: "Power Hourly Average 3-9"
+    unique_id: power_average_hourly_3to9
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT
+        ROUND(
+          SUM(delta_kwh) / 42.0,
+          3
+        ) AS state
+      FROM (
+        SELECT
+          s.state,
+          s.last_updated_ts,
+          CAST(s.state AS FLOAT) - LAG(CAST(s.state AS FLOAT))
+            OVER (PARTITION BY s.metadata_id ORDER BY s.last_updated_ts) AS delta_kwh,
+          CAST(
+            strftime('%H', datetime(s.last_updated_ts, 'unixepoch', '+10 hours'))
+          AS INTEGER) AS local_hour,
+          DATE(datetime(s.last_updated_ts, 'unixepoch', '+10 hours')) AS local_date
+        FROM states s
+        INNER JOIN states_meta sm
+          ON s.metadata_id = sm.metadata_id
+        WHERE
+          sm.entity_id = 'sensor.house_energy_consumption_today'
+          AND s.last_updated_ts >= unixepoch('now', '-30 days')
+          AND s.state NOT IN ('unavailable', 'unknown', '')
+          AND CAST(s.state AS FLOAT) >= 0
+      ) AS sub
+      WHERE
+        local_hour >= 15
+        AND local_hour < 21
+        AND local_date >= DATE(datetime(unixepoch('now', '+10 hours', '-30 days'), 'unixepoch'))
+        AND local_date < DATE(datetime(unixepoch('now'), 'unixepoch', '+10 hours'))
+        AND delta_kwh > 0
+        AND delta_kwh < 50
+    column: "state"
+    unit_of_measurement: "kWh"
+    device_class: energy
 
-fibaro:
-  gateways:
-    - url: http://10.0.1.115/api/
-      username: jay@powerun.com   
-      password: 753951Qqq
-      
 sensor:
   - platform: rest
     resource: https://10.0.1.117/ivp/meters/readings
@@ -83,7 +95,7 @@ sensor:
     scan_interval: 10
     value_template: "{{ value_json[0].activePower | float(0) }}"
     headers:
-      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxNzUyMzY3MTU0LCJpYXQiOjE3MjA4MzExNTQsImp0aSI6ImNhN2FhN2QzLTIwOTktNDBiMy1iNTNhLWFhM2FjMjcyYzE5OSIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.vv-L0b_VHo_ZVGsuKXaHw-IEigcAT4vdMWTYBzxR16QFRNpjKZNy2ohtZ2-jP6xL8wPzSmKTWnHN-IiOYci_YA
+      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxODEwMzM1NjU2LCJpYXQiOjE3Nzg3OTk2NTYsImp0aSI6IjgzODJlZjJmLWNjYWMtNDk5My05ZDMwLWU0ZjY3MDc1ZWUxNSIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.9ERcqyTbxWktuGI052JxuGlZXuBRGPaxBM-PkF53ujh3UGvr00BcPK9QsCD6buEo9yzlgbi1fKj0TffIuR6fZQ
     verify_ssl: False
     state_class: measurement
     device_class: power
@@ -106,7 +118,7 @@ sensor:
     scan_interval: 10
     value_template: "{{ value_json[0].cumulative.actPower | float(0) }}"
     headers:
-      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxNzUyMzY3MTU0LCJpYXQiOjE3MjA4MzExNTQsImp0aSI6ImNhN2FhN2QzLTIwOTktNDBiMy1iNTNhLWFhM2FjMjcyYzE5OSIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.vv-L0b_VHo_ZVGsuKXaHw-IEigcAT4vdMWTYBzxR16QFRNpjKZNy2ohtZ2-jP6xL8wPzSmKTWnHN-IiOYci_YA
+      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxODEwMzM1NjU2LCJpYXQiOjE3Nzg3OTk2NTYsImp0aSI6IjgzODJlZjJmLWNjYWMtNDk5My05ZDMwLWU0ZjY3MDc1ZWUxNSIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.9ERcqyTbxWktuGI052JxuGlZXuBRGPaxBM-PkF53ujh3UGvr00BcPK9QsCD6buEo9yzlgbi1fKj0TffIuR6fZQ
     verify_ssl: False
     state_class: measurement
     device_class: power
@@ -127,7 +139,7 @@ sensor:
     scan_interval: 10
     value_template: "{{ value_json[1].cumulative.actPower | float(0) }}"
     headers:
-      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxNzUyMzY3MTU0LCJpYXQiOjE3MjA4MzExNTQsImp0aSI6ImNhN2FhN2QzLTIwOTktNDBiMy1iNTNhLWFhM2FjMjcyYzE5OSIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.vv-L0b_VHo_ZVGsuKXaHw-IEigcAT4vdMWTYBzxR16QFRNpjKZNy2ohtZ2-jP6xL8wPzSmKTWnHN-IiOYci_YA
+      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxODEwMzM1NjU2LCJpYXQiOjE3Nzg3OTk2NTYsImp0aSI6IjgzODJlZjJmLWNjYWMtNDk5My05ZDMwLWU0ZjY3MDc1ZWUxNSIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.9ERcqyTbxWktuGI052JxuGlZXuBRGPaxBM-PkF53ujh3UGvr00BcPK9QsCD6buEo9yzlgbi1fKj0TffIuR6fZQ
     verify_ssl: False
     state_class: measurement
     device_class: power
@@ -171,35 +183,10 @@ sensor:
     unit_time: h
     unit_prefix: k
     method: left
-   
-  - platform: template
-    sensors:
-        
-      power_net_to_grid:
-        friendly_name: "Power Net To Grid"
-        unique_id: power_net_to_grid_id
-        unit_of_measurement: W
-        value_template: >-
-          {% set p = states('sensor.power_solar_production') | float(0) %}
-          {% set c = states('sensor.power_house_consumption') | float(0) %}
-          {% if p > c %} {{ states('sensor.power_solar_production') | float(0) - states('sensor.power_house_consumption') | float(0) }}
-          {% else %} 0
-          {% endif %}
-    
-      power_net_from_grid:
-        friendly_name: "Power Net From Grid"
-        unique_id: power_net_from_grid_id
-        unit_of_measurement: W
-        value_template: >-
-          {% set p = states('sensor.power_solar_production') | float(0) %}
-          {% set c = states('sensor.power_house_consumption') | float(0) %}
-          {% if p < c %} {{ states('sensor.power_house_consumption') | float(0) - states('sensor.power_solar_production') | float(0) }}
-          {% else %} 0
-          {% endif %}
 
   - platform: rest
-    name: 'Piano Room Curtain Position'
-    unique_id: "piano_room_curtain_position_id"
+    name: 'Piano Room Switchbot Curtains Position'
+    unique_id: "piano_room_switchbot_curtains_position_id"
     resource: !secret switchbot_curtain1_status_url
     method: GET
     scan_interval: 600
@@ -226,6 +213,81 @@ sensor:
     name: fibaro_pushover_state
     value_template: '{{ value_json.value }}'
 
+
+  # Statistics: average daily solar over last N days - Set max_age to 7 days
+  - platform: statistics
+    name: "solar energy daily avg 7 days"
+    entity_id: sensor.envoy_122206102804_energy_production_today
+    state_characteristic: mean
+    max_age:
+      days: 7
+
+  # Statistics: average house power over last 60 minutes
+  - platform: statistics
+    name: "house power avg 60m"
+    entity_id: sensor.x1_h8k_host_home_demand
+    state_characteristic: mean
+    max_age:
+      minutes: 1
+      
+  # AUBURN COSTCO petrol price via Scrape
+  - platform: scrape
+    resource: https://fuelradar.com.au/map/station/437aa5eea143da5dd19defc3
+    name: Costco Auburn E10
+    select: "#app"
+    attribute: data-page
+    value_template: >
+      {% set data = value | from_json %}
+      {% for p in data.props.stationData.Prices if p.Code == 'E10' %}
+        {{ p.Price | float / 10 }}
+      {% endfor %}
+    unit_of_measurement: "c/L"
+    scan_interval: 3600
+
+command_line:
+  - sensor:
+      name: Costco Auburn P98
+      unique_id: costco_auburn_p98
+      scan_interval: 3600
+      command: >-
+        curl -s -L --compressed
+        -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        -H "Accept-Language: en-AU,en;q=0.9"
+        -H "Accept-Encoding: gzip, deflate, br"
+        "https://fuelradar.com.au/map/station/437aa5eea143da5dd19defc3"
+        | python3 -c "import sys,json,re;html=sys.stdin.read();m=re.search(r'data-page=\"(.*?)\"',html);data=json.loads(m.group(1).replace('&quot;','\"')) if m else {};prices=data.get('props',{}).get('stationData',{}).get('Prices',[]);p98=next((p for p in prices if p['Code']=='P98'),None);print(p98['Price']/10 if p98 else '')"
+      unit_of_measurement: "c/L"
+
+  - sensor:
+      name: Costco Auburn E10
+      unique_id: costco_auburn_e10
+      scan_interval: 3600
+      command: >-
+        curl -s -L --compressed
+        -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        -H "Accept-Language: en-AU,en;q=0.9"
+        -H "Accept-Encoding: gzip, deflate, br"
+        "https://fuelradar.com.au/map/station/437aa5eea143da5dd19defc3"
+        | python3 -c "import sys,json,re;html=sys.stdin.read();m=re.search(r'data-page=\"(.*?)\"',html);data=json.loads(m.group(1).replace('&quot;','\"')) if m else {};prices=data.get('props',{}).get('stationData',{}).get('Prices',[]);e10=next((p for p in prices if p['Code']=='E10'),None);print(e10['Price']/10 if e10 else '')"
+      unit_of_measurement: "c/L"
+
+  - sensor:
+      name: Costco Auburn Diesel
+      unique_id: costco_auburn_diesel
+      scan_interval: 3600
+      command: >-
+        curl -s -L --compressed
+        -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        -H "Accept-Language: en-AU,en;q=0.9"
+        -H "Accept-Encoding: gzip, deflate, br"
+        "https://fuelradar.com.au/map/station/437aa5eea143da5dd19defc3"
+        | python3 -c "import sys,json,re;html=sys.stdin.read();m=re.search(r'data-page=\"(.*?)\"',html);data=json.loads(m.group(1).replace('&quot;','\"')) if m else {};prices=data.get('props',{}).get('stationData',{}).get('Prices',[]);pdsl=next((p for p in prices if p['Code']=='PDSL'),None);print(pdsl['Price']/10 if pdsl else '')"
+      unit_of_measurement: "c/L"
+
+      
 cover:
   - platform: cover_rf_time_based
     devices:
@@ -251,72 +313,6 @@ cover:
         always_confident: True #optional
         device_class: curtain #optional
 
-      lounge_blind_1:
-        name: "Lounge Blind 1"
-        travelling_time_up: 41
-        travelling_time_down: 31
-        close_script_entity_id: script.lounge_blind1_down
-        stop_script_entity_id: script.lounge_blind1_stop
-        open_script_entity_id: script.lounge_blind1_up
-        send_stop_at_ends: True #optional
-        always_confident: True #optional
-        device_class: curtain #optional
-        
-      lounge_blind_2:
-        name: "Lounge Blind 2"
-        travelling_time_up: 41
-        travelling_time_down: 31
-        close_script_entity_id: script.lounge_blind2_down
-        stop_script_entity_id: script.lounge_blind2_stop
-        open_script_entity_id: script.lounge_blind2_up
-        send_stop_at_ends: True #optional
-        always_confident: True #optional
-        device_class: curtain #optional
-
-      rose_room_blind_1:
-        name: "Rose Room Blind 1"
-        travelling_time_up: 30
-        travelling_time_down: 28
-        close_script_entity_id: script.rose_room_blind1_down
-        stop_script_entity_id: script.rose_room_blind1_stop
-        open_script_entity_id: script.rose_room_blind1_up
-        send_stop_at_ends: True #optional
-        always_confident: True #optional
-        device_class: curtain #optional
-        
-      rose_room_blind_2:
-        name: "Rose Room Blind 2"
-        travelling_time_up: 80
-        travelling_time_down: 80
-        close_script_entity_id: script.rose_room_blind2_down
-        stop_script_entity_id: script.rose_room_blind2_stop
-        open_script_entity_id: script.rose_room_blind2_up
-        send_stop_at_ends: True #optional
-        always_confident: True #optional
-        device_class: curtain #optional
-
-      cello_room_blind_1:
-        name: "Cello Room Blind 1"
-        travelling_time_up: 37
-        travelling_time_down: 32
-        close_script_entity_id: script.cello_room_blind1_down
-        stop_script_entity_id: script.cello_room_blind1_stop
-        open_script_entity_id: script.cello_room_blind1_up
-        send_stop_at_ends: True #optional
-        always_confident: True #optional
-        device_class: curtain #optional
-        
-      cello_room_blind_2:
-        name: "Cello Room Blind 2"
-        travelling_time_up: 41
-        travelling_time_down: 30
-        close_script_entity_id: script.cello_room_blind2_down
-        stop_script_entity_id: script.cello_room_blind2_stop
-        open_script_entity_id: script.cello_room_blind2_up
-        send_stop_at_ends: True #optional
-        always_confident: True #optional
-        device_class: curtain #optional
-
       master_room_blind_1:
         name: "Master Room Blind 1"
         travelling_time_up: 32
@@ -338,68 +334,6 @@ cover:
         send_stop_at_ends: True #optional
         always_confident: True #optional
         device_class: curtain #optional
-
-      2nd_floor_blind_1:
-        name: "2nd Floor Blind 1"
-        travelling_time_up: 37
-        travelling_time_down: 32
-        close_script_entity_id: script.2nd_floor_blind1_down
-        stop_script_entity_id: script.2nd_floor_blind1_stop
-        open_script_entity_id: script.2nd_floor_blind1_up
-        send_stop_at_ends: True #optional
-        always_confident: True #optional
-        device_class: curtain #optional
-        
-      2nd_floor_blind_2:
-        name: "2nd Floor Blind 2"
-        travelling_time_up: 41
-        travelling_time_down: 30
-        close_script_entity_id: script.2nd_floor_blind2_down
-        stop_script_entity_id: script.2nd_floor_blind2_stop
-        open_script_entity_id: script.2nd_floor_blind2_up
-        send_stop_at_ends: True #optional
-        always_confident: True #optional
-        device_class: curtain #optional
-
-      isabelle_room_blind:
-        name: "Isabelle Room Blind"
-        travelling_time_up: 22
-        travelling_time_down: 18
-        close_script_entity_id: script.isabelle_room_blind_down
-        stop_script_entity_id: script.isabelle_room_blind_stop
-        open_script_entity_id: script.isabelle_room_blind_up
-        send_stop_at_ends: True #optional
-        always_confident: True #optional
-        device_class: curtain #optional
-
-  - platform: template
-    covers:
-      pianoroom_curtains:
-        device_class: curtain
-        friendly_name: "piano_room_curtain_id"
-        unique_id: power_house_consumption_id
-        position_template: "{{ states('sensor.piano_room_curtain_position') }}"
-        open_cover:
-          service: rest_command.switchbot_device_command
-          data:
-            deviceId: !secret switchbot_curtain1_deviceId
-            command: "turnOn"
-        close_cover:
-          service: rest_command.switchbot_device_command
-          data:
-            deviceId: !secret switchbot_curtain1_deviceId
-            command: "turnOff"
-        stop_cover:
-          service: rest_command.switchbot_device_command
-          data:
-            deviceId: !secret switchbot_curtain1_deviceId
-            command: "turnOff"
-        set_cover_position:
-          service: rest_command.switchbot_device_command
-          data:
-            deviceId: !secret switchbot_curtain1_deviceId
-            command: "setPosition"
-            parameter: "0,ff,{{position}}"
             
 rest_command:
   switchbot_device_command:
@@ -444,7 +378,6 @@ rest_command:
     headers:
       Content-Type: "application/json"
 
-
   fibaro_studylight_off:
     method: GET   
     url: "http://10.0.1.115/api/callAction?deviceID=340&name=turnOff"
@@ -462,6 +395,29 @@ rest_command:
     payload: '{}'
     headers:
       Content-Type: application/json
+
+  emhass_dayahead_optim:
+    url: http://127.0.0.1:5000/action/dayahead-optim
+    method: POST
+    content_type: "application/json"
+    timeout: 240
+    payload: "{{ payload }}"
+
+  emhass_naive_mpc_optim:
+    url: http://127.0.0.1:5000/action/naive-mpc-optim
+    method: POST
+    content_type: "application/json"
+    timeout: 240
+    payload: "{{ payload }}"
+    
+  emhass_publish_data:
+    url: http://127.0.0.1:5000/action/publish-data
+    method: POST
+    content_type: "application/json"
+    timeout: 240
+    payload: "{{ payload }}"
+
+
 
 input_boolean:
   auto_dyson_heater:
@@ -486,8 +442,6 @@ logger:
     homeassistant.components.rest: debug
     custom_components.ha_blueair: debug
     blueair_api: debug
-    
-    
     
 media_player:
   - platform: webrtc

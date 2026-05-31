@@ -1,0 +1,49 @@
+# Lovelace Markdown card: upcoming EMHASS battery schedule.
+# Paste into a dashboard (Edit dashboard -> Add card -> Manual).
+#
+# Forecast attribute names differ per sensor (all 5-min, index-aligned, string values):
+#   sensor.mpc_batt_power    -> 'battery_scheduled_power' (value key mpc_batt_power)
+#   sensor.mpc_grid_power    -> 'forecasts'               (value key mpc_grid_power)
+#   sensor.mpc_general_price -> 'unit_load_cost_forecasts' (import price, $/kWh)
+#   sensor.mpc_feed_in_price -> 'unit_prod_price_forecasts'(export price, $/kWh)
+#
+# Total $ = sum over the block of  -(grid_kW * 5/60 h * price)
+#   import price when grid > 0 (cost, negative); feed-in price when grid < 0 (revenue, positive).
+
+type: markdown
+title: 🔋EMHASS Battery Plan
+content: |
+  **{{ states('input_text.emhass_battery_status') }}**
+
+  {% set b = state_attr('sensor.mpc_batt_power','battery_scheduled_power') or [] %}
+  {% set g = state_attr('sensor.mpc_grid_power','forecasts') or [] %}
+  {% set imp = state_attr('sensor.mpc_general_price','unit_load_cost_forecasts') or [] %}
+  {% set exp = state_attr('sensor.mpc_feed_in_price','unit_prod_price_forecasts') or [] %}
+  {% set n = [b|length, g|length, imp|length, exp|length]|min %}
+  {% set ns = namespace(blocks=[]) %}
+  {% for i in range(n) %}
+    {% set bk = (b[i].keys()|reject('eq','date')|list|first) %}
+    {% set gk = (g[i].keys()|reject('eq','date')|list|first) %}
+    {% set ik = (imp[i].keys()|reject('eq','date')|list|first) %}
+    {% set ek = (exp[i].keys()|reject('eq','date')|list|first) %}
+    {% set bv = b[i][bk]|float(0) %}
+    {% set gv = g[i][gk]|float(0) %}
+    {% set price = (imp[i][ik]|float(0)) if gv > 0 else (exp[i][ek]|float(0)) %}
+    {% set usd = -(gv / 1000) * (5 / 60) * price %}
+    {% set m = 'charge' if (gv != 0 and bv < 0) else ('discharge' if (gv != 0 and bv > 0) else 'load-following') %}
+    {% if ns.blocks and ns.blocks[-1].mode == m %}
+      {% set merged = {'mode': m, 'start': ns.blocks[-1].start, 'count': ns.blocks[-1].count + 1, 'kw': [ns.blocks[-1].kw, (bv|abs/1000)]|max, 'usd': ns.blocks[-1].usd + usd, 'wnum': ns.blocks[-1].wnum + (gv|abs) * price, 'wden': ns.blocks[-1].wden + (gv|abs)} %}
+      {% set ns.blocks = ns.blocks[:-1] + [merged] %}
+    {% else %}
+      {% set ns.blocks = ns.blocks + [{'mode': m, 'start': b[i].date, 'count': 1, 'kw': bv|abs/1000, 'usd': usd, 'wnum': (gv|abs) * price, 'wden': gv|abs}] %}
+    {% endif %}
+  {% endfor %}
+  {% if ns.blocks|length == 0 %}
+  _No EMHASS forecast available._
+  {% else %}
+  | Time | Mode | For | Peak kW | Total $ |
+  |---|---|---|---|---|
+  {% for blk in ns.blocks -%}
+  | {{ as_timestamp(blk.start)|timestamp_custom('%a %H:%M', true) }} | {{ blk.mode if blk.mode == 'load-following' else blk.mode ~ ' - ' ~ '%.3f'|format(blk.wnum / blk.wden if blk.wden > 0 else 0) }} | {{ blk.count * 5 }} min | {{ '%.2f'|format(blk.kw) if blk.mode != 'load-following' else '—' }} | {{ '%+.2f'|format(blk.usd) if blk.mode != 'load-following' else '—' }} |
+  {% endfor %}
+  {% endif %}

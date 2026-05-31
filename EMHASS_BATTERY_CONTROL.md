@@ -115,6 +115,36 @@ status text.
 
 ---
 
+## Future-plan visualisation
+
+Two companion artefacts surface the *upcoming* plan (the EMHASS forecast, not just
+the current timestep):
+
+- **`template/emhass_future_plan_template.yaml`** → `sensor.emhass_next_mode_change`
+  with attributes `current_mode`, `starts_at`, `duration_min`. Useful for tiles,
+  badges, and pre-change notifications.
+- **`emhass_future_plan_card.yaml`** → a Markdown dashboard card rendering the
+  schedule as collapsed mode blocks: time, `mode - <unit price>`, duration,
+  peak kW, and a signed grid `Total $`.
+
+Both derive mode from the same grid-flow logic as the control script and read
+these forecast attributes (all 5-minute, index-aligned, string values):
+
+| Entity | Attribute | Value key | Meaning |
+|---|---|---|---|
+| `sensor.mpc_batt_power` | `battery_scheduled_power` | `mpc_batt_power` | planned battery power |
+| `sensor.mpc_grid_power` | `forecasts` | `mpc_grid_power` | planned grid flow |
+| `sensor.mpc_general_price` | `unit_load_cost_forecasts` | — | import price ($/kWh) |
+| `sensor.mpc_feed_in_price` | `unit_prod_price_forecasts` | — | export price ($/kWh) |
+
+Per block: `Total $ = Σ −(grid_kW × 5/60 h × price)` (import price when importing,
+feed-in price when exporting; negative = cost, positive = revenue). The unit price
+shown in the mode label is the **energy-weighted** effective rate
+`Σ(|grid| × price) ÷ Σ|grid|`.
+
+Loading: requires `template: !include_dir_merge_list template/` in
+`configuration.yaml`, with the template file placed under `template/`.
+
 ## Notes / limitations
 
 - **Resolution blind spot:** EMHASS works at 30-min resolution and collapses each

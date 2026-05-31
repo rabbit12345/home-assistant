@@ -1,0 +1,109 @@
+# EMHASS future planned battery mode/duration, derived from the forecast
+# attribute published on sensor.mpc_batt_power / sensor.mpc_grid_power.
+# Logic mirrors "EMHASS battery control script.yaml":
+#   p_grid != 0 and p_batt < 0 -> charge
+#   p_grid != 0 and p_batt > 0 -> discharge
+#   else                       -> load-following
+#
+# Forecast attribute names differ per sensor:
+#   sensor.mpc_batt_power -> attribute 'battery_scheduled_power' (value key mpc_batt_power)
+#   sensor.mpc_grid_power -> attribute 'forecasts'               (value key mpc_grid_power)
+# Both are 5-minute resolution, index-aligned. Values are strings (|float handles it).
+
+- sensor:
+    - name: "EMHASS Next Mode Change"
+      unique_id: emhass_next_mode_change
+      icon: mdi:battery-clock
+      state: >
+        {%- macro nextchange() -%}
+          {%- set b = state_attr('sensor.mpc_batt_power','battery_scheduled_power') or [] -%}
+          {%- set g = state_attr('sensor.mpc_grid_power','forecasts') or [] -%}
+          {%- set ns = namespace(rows=[], k=-1, cnt=0) -%}
+          {%- for i in range([b|length, g|length]|min) -%}
+            {%- set bk = (b[i].keys()|reject('eq','date')|list|first) -%}
+            {%- set gk = (g[i].keys()|reject('eq','date')|list|first) -%}
+            {%- set bv = b[i][bk]|float(0) -%}
+            {%- set gv = g[i][gk]|float(0) -%}
+            {%- set m = 'charge' if (gv != 0 and bv < 0) else ('discharge' if (gv != 0 and bv > 0) else 'load-following') -%}
+            {%- set ns.rows = ns.rows + [(b[i].date, m, bv)] -%}
+          {%- endfor -%}
+          {%- if ns.rows|length == 0 -%}none||0|unknown|0
+          {%- else -%}
+            {%- set cur = ns.rows[0][1] -%}
+            {%- for i in range(ns.rows|length) -%}
+              {%- if ns.k == -1 and ns.rows[i][1] != cur -%}{%- set ns.k = i -%}{%- endif -%}
+            {%- endfor -%}
+            {%- if ns.k == -1 -%}none||0|{{ cur }}|0
+            {%- else -%}
+              {%- set nm = ns.rows[ns.k][1] -%}
+              {%- for i in range(ns.k, ns.rows|length) -%}
+                {%- if ns.rows[i][1] == nm and ns.cnt == (i - ns.k) -%}{%- set ns.cnt = ns.cnt + 1 -%}{%- endif -%}
+              {%- endfor -%}
+              {{ nm }}|{{ ns.rows[ns.k][0] }}|{{ ns.cnt * 5 }}|{{ cur }}|{{ (ns.rows[ns.k][2]|abs / 1000)|round(2) }}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endmacro -%}
+        {{ (nextchange()|trim).split('|')[0] }}
+      attributes:
+        current_mode: >
+          {%- set b = state_attr('sensor.mpc_batt_power','battery_scheduled_power') or [] -%}
+          {%- set g = state_attr('sensor.mpc_grid_power','forecasts') or [] -%}
+          {%- if b|length == 0 or g|length == 0 -%}unknown
+          {%- else -%}
+            {%- set bk = (b[0].keys()|reject('eq','date')|list|first) -%}
+            {%- set gk = (g[0].keys()|reject('eq','date')|list|first) -%}
+            {%- set bv = b[0][bk]|float(0) -%}
+            {%- set gv = g[0][gk]|float(0) -%}
+            {{ 'charge' if (gv != 0 and bv < 0) else ('discharge' if (gv != 0 and bv > 0) else 'load-following') }}
+          {%- endif -%}
+        starts_at: >
+          {%- set rows = state_attr('sensor.mpc_batt_power','battery_scheduled_power') or [] -%}
+          {%- set g = state_attr('sensor.mpc_grid_power','forecasts') or [] -%}
+          {%- set ns = namespace(out='', k=-1) -%}
+          {%- set modes = [] -%}
+          {%- set ns2 = namespace(modes=[]) -%}
+          {%- for i in range([rows|length, g|length]|min) -%}
+            {%- set bk = (rows[i].keys()|reject('eq','date')|list|first) -%}
+            {%- set gk = (g[i].keys()|reject('eq','date')|list|first) -%}
+            {%- set bv = rows[i][bk]|float(0) -%}
+            {%- set gv = g[i][gk]|float(0) -%}
+            {%- set m = 'charge' if (gv != 0 and bv < 0) else ('discharge' if (gv != 0 and bv > 0) else 'load-following') -%}
+            {%- set ns2.modes = ns2.modes + [m] -%}
+          {%- endfor -%}
+          {%- if ns2.modes|length == 0 -%}unknown
+          {%- else -%}
+            {%- set cur = ns2.modes[0] -%}
+            {%- for i in range(ns2.modes|length) -%}
+              {%- if ns.k == -1 and ns2.modes[i] != cur -%}{%- set ns.k = i -%}{%- endif -%}
+            {%- endfor -%}
+            {%- if ns.k == -1 -%}none
+            {%- else -%}{{ as_timestamp(rows[ns.k].date)|timestamp_custom('%a %H:%M', true) }}
+            {%- endif -%}
+          {%- endif -%}
+        duration_min: >
+          {%- set rows = state_attr('sensor.mpc_batt_power','battery_scheduled_power') or [] -%}
+          {%- set g = state_attr('sensor.mpc_grid_power','forecasts') or [] -%}
+          {%- set ns = namespace(modes=[], k=-1, cnt=0) -%}
+          {%- for i in range([rows|length, g|length]|min) -%}
+            {%- set bk = (rows[i].keys()|reject('eq','date')|list|first) -%}
+            {%- set gk = (g[i].keys()|reject('eq','date')|list|first) -%}
+            {%- set bv = rows[i][bk]|float(0) -%}
+            {%- set gv = g[i][gk]|float(0) -%}
+            {%- set m = 'charge' if (gv != 0 and bv < 0) else ('discharge' if (gv != 0 and bv > 0) else 'load-following') -%}
+            {%- set ns.modes = ns.modes + [m] -%}
+          {%- endfor -%}
+          {%- if ns.modes|length == 0 -%}0
+          {%- else -%}
+            {%- set cur = ns.modes[0] -%}
+            {%- for i in range(ns.modes|length) -%}
+              {%- if ns.k == -1 and ns.modes[i] != cur -%}{%- set ns.k = i -%}{%- endif -%}
+            {%- endfor -%}
+            {%- if ns.k == -1 -%}0
+            {%- else -%}
+              {%- set nm = ns.modes[ns.k] -%}
+              {%- for i in range(ns.k, ns.modes|length) -%}
+                {%- if ns.modes[i] == nm and ns.cnt == (i - ns.k) -%}{%- set ns.cnt = ns.cnt + 1 -%}{%- endif -%}
+              {%- endfor -%}{{ ns.cnt * 5 }}
+            {%- endif -%}
+          {%- endif -%}
+        unit_of_measurement_duration: "min"
