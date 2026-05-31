@@ -1,5 +1,5 @@
-alias: EMHASS Amber Battery Management
-description: "automatically control the Amber battery system via EMHASS energy plan"
+alias: EMHASS Amber - Anker Battery Management
+description: "automatically control the Amber - Anker battery system via EMHASS energy plan"
 triggers:
   - trigger: state
     entity_id:
