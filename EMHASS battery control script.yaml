@@ -1,0 +1,104 @@
+alias: EMHASS Amber Battery Management
+description: "automatically control the Amber battery system via EMHASS energy plan"
+triggers:
+  - trigger: state
+    entity_id:
+      - sensor.mpc_batt_power
+      - sensor.mpc_grid_power
+    from: null
+    to: null
+actions:
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 1
+      milliseconds: 0
+  - variables:
+      p_batt: "{{ states('sensor.mpc_batt_power') | int(0) }}"
+      p_grid: "{{ states('sensor.mpc_grid_power') | int(0) }}"
+      p_batt_kw: "{{ (p_batt | abs / 1000) | round(2) }}"
+      override_duration: 10
+      control_enabled: "{{ is_state('input_boolean.emhass_battery_control', 'on') }}"
+      planned_mode: >-
+        {% if p_grid != 0 and p_batt < 0 %}charge
+        {%- elif p_grid != 0 and p_batt > 0 %}discharge
+        {%- else %}load-following{% endif %}
+      status_text: >-
+        {% if planned_mode in ['charge', 'discharge'] %}
+        Pending: {{ planned_mode }} {{ p_batt_kw }} kW for {{ override_duration }} min
+        {%- else %}
+        Pending: load-following
+        {%- endif %}
+        {{- '' if control_enabled else ' — CONTROL DISABLED' }}
+  # Feature 2: always publish pending plan to dashboard (runs even when control disabled)
+  - action: input_text.set_value
+    metadata: {}
+    data:
+      value: "{{ status_text }}"
+    target:
+      entity_id: input_text.emhass_battery_status
+    alias: Display pending battery mode change
+  # Feature 1: only execute battery control when enabled
+  - if:
+      - condition: template
+        value_template: "{{ control_enabled }}"
+    then:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ planned_mode == 'charge' }}"
+            sequence:
+              - action: select.select_option
+                metadata: {}
+                data:
+                  option: charge
+                target:
+                  entity_id: select.amber_bridge_ashqb71f39300081_requested_mode
+              - action: number.set_value
+                metadata: {}
+                data:
+                  value: "{{ override_duration }}"
+                target:
+                  entity_id: number.amber_bridge_ashqb71f39300081_requested_duration
+              - action: button.press
+                metadata: {}
+                data: {}
+                target:
+                  entity_id: button.amber_bridge_ashqb71f39300081_apply_override
+            alias: Grid charging - charge override
+          - conditions:
+              - condition: template
+                value_template: "{{ planned_mode == 'discharge' }}"
+            sequence:
+              - action: select.select_option
+                metadata: {}
+                data:
+                  option: discharge
+                target:
+                  entity_id: select.amber_bridge_ashqb71f39300081_requested_mode
+              - action: number.set_value
+                metadata: {}
+                data:
+                  value: "{{ override_duration }}"
+                target:
+                  entity_id: number.amber_bridge_ashqb71f39300081_requested_duration
+              - action: button.press
+                metadata: {}
+                data: {}
+                target:
+                  entity_id: button.amber_bridge_ashqb71f39300081_apply_override
+            alias: Grid export - discharge override
+        default:
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ states('sensor.amber_bridge_ashqb71f39300081_active_override_value')
+                  not in ['none', 'auto', 'selfconsume', 'unknown', 'unavailable', ''] }}
+            then:
+              - action: button.press
+                metadata: {}
+                data: {}
+                target:
+                  entity_id: button.amber_bridge_ashqb71f39300081_cancel_override
+                alias: Cancel active override - return to load-following
+mode: single
