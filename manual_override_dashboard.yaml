@@ -1,0 +1,101 @@
+# =============================================================================
+# Battery Override Scheduler — paste as a CARD into an existing dashboard.
+#   Edit dashboard -> Add Card -> Manual -> paste everything below.
+#
+# Requires (HACS frontend): Mushroom (custom:mushroom-*).
+# Native cards used: calendar, markdown, entities.
+# No emoji in YAML (some editors reject them); icons are mdi via cards.
+# =============================================================================
+type: vertical-stack
+cards:
+  - type: custom:mushroom-title-card
+    title: Battery Override Scheduler
+    subtitle: Manual schedule that overrides EMHASS
+
+  # ---- Live status ----
+  - type: custom:mushroom-template-card
+    primary: >-
+      {% if states('input_number.active_override_priority') | int(0) > 0 %}
+      MANUAL: {{ states('input_select.active_override_mode') }} - prio
+      {{ states('input_number.active_override_priority') | int }}
+      {% else %}EMHASS in control{% endif %}
+    secondary: >-
+      {% if states('input_number.active_override_priority') | int(0) > 0 %}
+      ends {{ as_timestamp(states('input_datetime.active_override_until'), 0) | timestamp_custom('%a %H:%M', true) }}
+      - {{ states('input_text.emhass_battery_status') }}
+      {% else %}{{ states('input_text.emhass_battery_status') }}{% endif %}
+    icon: >-
+      {% set m = states('input_select.active_override_mode') %}
+      {% if m == 'charge' %}mdi:battery-charging
+      {% elif m == 'discharge' %}mdi:battery-arrow-down
+      {% elif m == 'preserve' %}mdi:battery-lock
+      {% else %}mdi:home-lightning-bolt{% endif %}
+    icon_color: >-
+      {% if states('input_number.active_override_priority') | int(0) > 0 %}orange
+      {% else %}green{% endif %}
+
+  - type: custom:mushroom-entity-card
+    entity: input_boolean.manual_overrides_enabled
+    name: Manual overrides
+    icon: mdi:calendar-check
+    tap_action:
+      action: toggle
+
+  # ---- Add-job form ----
+  - type: custom:mushroom-title-card
+    subtitle: Schedule a new override
+  - type: entities
+    show_header_toggle: false
+    entities:
+      - entity: input_select.override_form_mode
+        name: Mode
+      - entity: input_datetime.override_form_start
+        name: Start
+      - entity: input_number.override_form_duration
+        name: Duration
+      - entity: input_number.override_form_priority
+        name: Priority
+      - entity: input_select.override_form_repeat
+        name: Repeat
+  - type: custom:mushroom-template-card
+    primary: Add to schedule
+    secondary: Creates the calendar job
+    icon: mdi:calendar-plus
+    icon_color: blue
+    tap_action:
+      action: call-service
+      service: script.create_override_job
+
+  # ---- Upcoming list ----
+  - type: custom:mushroom-title-card
+    subtitle: Scheduled overrides
+  - type: markdown
+    content: >
+      {% set jobs = state_attr('sensor.battery_override_schedule', 'jobs') or [] %}
+      {% if jobs | count == 0 %}_No upcoming overrides._
+      {% else %}| When | Mode | Dur | Prio | State |
+
+      |---|---|--:|--:|:--:|
+
+      {% for j in jobs %}| {{ as_timestamp(j.start, 0) | timestamp_custom('%a %d %b %H:%M', true) }} | {{ j.mode }} | {{ j.duration }}m | {{ j.priority }} | {{ 'paused' if j.paused else 'armed' }} |
+
+      {% endfor %}{% endif %}
+
+      _Tap an event in the calendar below to edit or delete it._
+
+  # ---- Native calendar timeline ----
+  - type: calendar
+    initial_view: listWeek
+    entities:
+      - calendar.battery_overrides
+
+  # ---- History ----
+  - type: custom:mushroom-title-card
+    subtitle: Recently executed
+  - type: markdown
+    content: >
+      {% set log = states('input_text.manual_override_log') | from_json(default=[]) %}
+      {% if log | count == 0 %}_No history yet._
+      {% else %}{% for r in log %}- {{ r }}
+
+      {% endfor %}{% endif %}

@@ -10,6 +10,7 @@ homeassistant:
       state_class: total_increasing
   latitude: -33.880218505859375
   longitude: 151.07440370422248
+  packages: !include_dir_named packages
 
 frontend:
   themes: !include_dir_merge_named themes
@@ -395,29 +396,6 @@ rest_command:
     payload: '{}'
     headers:
       Content-Type: application/json
-
-  emhass_dayahead_optim:
-    url: http://127.0.0.1:5000/action/dayahead-optim
-    method: POST
-    content_type: "application/json"
-    timeout: 240
-    payload: "{{ payload }}"
-
-  emhass_naive_mpc_optim:
-    url: http://127.0.0.1:5000/action/naive-mpc-optim
-    method: POST
-    content_type: "application/json"
-    timeout: 240
-    payload: "{{ payload }}"
-    
-  emhass_publish_data:
-    url: http://127.0.0.1:5000/action/publish-data
-    method: POST
-    content_type: "application/json"
-    timeout: 240
-    payload: "{{ payload }}"
-
-
 
 input_boolean:
   auto_dyson_heater:

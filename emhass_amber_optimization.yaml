@@ -1,0 +1,53 @@
+###############################################################################
+# EMHASS — Day-ahead optimisation with Amber price forecast
+#
+# Calls EMHASS /dayahead-optim every 30 minutes, feeding it:
+#   - Amber 30-min price forecasts (cost + feed-in)
+#   - Solcast PV forecast (EMHASS fetches directly if configured)
+#
+# EMHASS add-on runs on port 5300 by default (adjust if changed).
+#
+# Requires: EMHASS add-on installed and configured with your sensor IDs.
+###############################################################################
+
+automation:
+  - alias: "EMHASS - Run day-ahead optimisation"
+    id: emhass_dayahead_optim
+    description: >
+      Every 30 min, extract Amber price forecasts and call EMHASS
+      /dayahead-optim so it can compute optimal battery charge schedule.
+    trigger:
+      - platform: time_pattern
+        minutes: "/30"
+    action:
+      - variables:
+          forecasts: >
+            {{ state_attr('sensor.amber_express_wilson_general_price_detailed', 'forecasts') or [] }}
+          # Build parallel lists of timestamps and prices for EMHASS
+          # EMHASS expects: {"list_prices": [...], "list_forecast_dates": [...]}
+          # Prices in $/kWh (Amber already provides this in per_kwh)
+          price_list: >
+            {{ forecasts | map(attribute='per_kwh') | list }}
+          date_list: >
+            {{ forecasts | map(attribute='start_time') | list }}
+
+      - condition: template
+        value_template: "{{ price_list | count >= 2 }}"
+
+      - action: rest_command.emhass_dayahead_optim
+        data:
+          cost_forecast: "{{ price_list }}"
+          prod_price_forecast: >
+            {{
+              forecasts
+              | map(attribute='renewables_forecastband_cents')
+              | map('default', 0)
+              | map('multiply', 0.01)
+              | list
+            }}
+          forecast_dates: "{{ date_list }}"
+
+# NOTE: rest_command.emhass_dayahead_optim is defined centrally in
+# configuration.yaml (http://127.0.0.1:5000/action/dayahead-optim). It was
+# previously redefined here (port 5300), which caused a duplicate-key error
+# once package merging was enabled. Removed to keep a single definition.

@@ -2,6 +2,22 @@
 
 All notable changes to `EMHASS battery control script.yaml`.
 
+## [Unreleased] — 2026-06-02
+
+### Added
+- **Manual Scheduled Override layer** (`packages/manual_override.yaml`) — a
+  calendar-backed scheduler that overrides EMHASS by priority. See
+  `MANUAL_OVERRIDE_SCHEDULER.md`. New `calendar.battery_overrides` (local
+  calendar, added via UI), an add-job form, a per-minute coordinator that picks
+  the highest-priority active job and drives the Amber Bridge, a history ring
+  buffer, and a Mushroom dashboard (`manual_override_dashboard.yaml`).
+- `configuration.yaml`: `packages: !include_dir_named packages`.
+
+### Changed
+- Executor now **yields to a manual override**: control block gained a
+  `numeric_state` guard on `input_number.active_override_priority` (below 1),
+  and `status_text` shows a `MANUAL: <mode> (prio N)` line while a job is active.
+
 ## [Unreleased] — 2026-05-31
 
 ### Added

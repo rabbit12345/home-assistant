@@ -23,8 +23,12 @@ actions:
         {% if p_grid != 0 and p_batt < 0 %}charge
         {%- elif p_grid != 0 and p_batt > 0 %}discharge
         {%- else %}load-following{% endif %}
+      manual_priority: "{{ states('input_number.active_override_priority') | int(0) }}"
       status_text: >-
-        {% if planned_mode in ['charge', 'discharge'] %}
+        {% if manual_priority > 0 %}
+        MANUAL: {{ states('input_select.active_override_mode') }} (prio {{ manual_priority }}) —
+        ends {{ as_timestamp(states('input_datetime.active_override_until'), 0) | timestamp_custom('%H:%M', true) }}
+        {%- elif planned_mode in ['charge', 'discharge'] %}
         Pending: {{ planned_mode }} {{ p_batt_kw }} kW for {{ override_duration }} min
         {%- else %}
         Pending: load-following
@@ -38,10 +42,14 @@ actions:
     target:
       entity_id: input_text.emhass_battery_status
     alias: Display pending battery mode change
-  # Feature 1: only execute battery control when enabled
+  # Feature 1: only execute battery control when enabled AND no manual override wins.
+  # A manual scheduled override (priority >= 1) suppresses EMHASS for its window.
   - if:
       - condition: template
         value_template: "{{ control_enabled }}"
+      - condition: numeric_state
+        entity_id: input_number.active_override_priority
+        below: 1
     then:
       - choose:
           - conditions:

@@ -1,0 +1,356 @@
+# =============================================================================
+# Manual Scheduled Battery Override
+# -----------------------------------------------------------------------------
+# A manual scheduling layer that sits ABOVE EMHASS. Each job = one event in the
+# `calendar.battery_overrides` local calendar. A coordinator picks the highest
+# priority job active right now, drives the Amber Bridge, and suppresses the
+# EMHASS executor for the duration. When no job is active, EMHASS resumes.
+#
+# REQUIRED ONE-TIME UI STEP (local_calendar cannot be created in YAML):
+#   Settings -> Devices & Services -> Add Integration -> Local Calendar
+#   Name it exactly:  Battery Overrides     -> entity_id: calendar.battery_overrides
+#
+# Job encoding inside each calendar event:
+#   summary:      "Override: charge"      ('[OFF]' prefix = paused/ignored)
+#   description:  "mode: charge\npriority: 80"
+#   start/end:    start time .. start+duration
+#   rrule:        empty = one-off; else recurrence (daily/weekdays/weekly)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
+input_boolean:
+  manual_overrides_enabled:
+    name: Manual Overrides Enabled
+    icon: mdi:calendar-clock
+
+input_select:
+  # --- Add-job form ---
+  override_form_mode:
+    name: Override Form Mode
+    icon: mdi:battery-charging
+    options:
+      - charge
+      - discharge
+      - preserve
+      - selfconsume
+      - auto
+  override_form_repeat:
+    name: Override Form Repeat
+    icon: mdi:repeat
+    options:
+      - Once
+      - Daily
+      - Weekdays
+      - Weekly
+  # --- Live state (written by coordinator) ---
+  active_override_mode:
+    name: Active Override Mode
+    icon: mdi:flash
+    options:
+      - none
+      - charge
+      - discharge
+      - preserve
+      - selfconsume
+      - auto
+
+input_number:
+  override_form_duration:
+    name: Override Form Duration
+    icon: mdi:timer-sand
+    min: 1
+    max: 200
+    step: 1
+    unit_of_measurement: min
+    mode: slider
+  override_form_priority:
+    name: Override Form Priority
+    icon: mdi:priority-high
+    min: 1
+    max: 100
+    step: 5
+    mode: slider
+  active_override_priority:
+    name: Active Override Priority
+    icon: mdi:priority-high
+    min: 0
+    max: 100
+    step: 1
+    mode: box
+
+input_datetime:
+  override_form_start:
+    name: Override Form Start
+    icon: mdi:clock-start
+    has_date: true
+    has_time: true
+  active_override_until:
+    name: Active Override Until
+    icon: mdi:clock-end
+    has_date: true
+    has_time: true
+
+input_text:
+  active_override_owner:
+    name: Active Override Owner
+    max: 255
+  manual_override_log:
+    name: Manual Override Log
+    max: 255
+
+# -----------------------------------------------------------------------------
+# Scripts
+# -----------------------------------------------------------------------------
+script:
+  # Create a calendar job from the add-job form helpers.
+  create_override_job:
+    alias: Create Override Job
+    icon: mdi:calendar-plus
+    sequence:
+      - variables:
+          mode: "{{ states('input_select.override_form_mode') }}"
+          dur: "{{ states('input_number.override_form_duration') | int(30) }}"
+          prio: "{{ states('input_number.override_form_priority') | int(50) }}"
+          repeat: "{{ states('input_select.override_form_repeat') }}"
+          start_dt: "{{ states('input_datetime.override_form_start') }}"
+          end_dt: >-
+            {{ (as_datetime(states('input_datetime.override_form_start'))
+                + timedelta(minutes=states('input_number.override_form_duration') | int(30)))
+                .strftime('%Y-%m-%d %H:%M:%S') }}
+          rrule: >-
+            {% if repeat == 'Daily' %}FREQ=DAILY
+            {%- elif repeat == 'Weekdays' %}FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR
+            {%- elif repeat == 'Weekly' %}FREQ=WEEKLY
+            {%- else %}{% endif %}
+      - choose:
+          - conditions: "{{ rrule | length > 0 }}"
+            sequence:
+              - action: calendar.create_event
+                target:
+                  entity_id: calendar.battery_overrides
+                data:
+                  summary: "Override: {{ mode }}"
+                  description: "mode: {{ mode }}\npriority: {{ prio }}"
+                  start_date_time: "{{ start_dt }}"
+                  end_date_time: "{{ end_dt }}"
+                  rrule: "{{ rrule }}"
+        default:
+          - action: calendar.create_event
+            target:
+              entity_id: calendar.battery_overrides
+            data:
+              summary: "Override: {{ mode }}"
+              description: "mode: {{ mode }}\npriority: {{ prio }}"
+              start_date_time: "{{ start_dt }}"
+              end_date_time: "{{ end_dt }}"
+
+  # Coordinator: decide the winning job and drive the Amber Bridge.
+  evaluate_manual_override:
+    alias: Evaluate Manual Override
+    icon: mdi:gavel
+    mode: single
+    sequence:
+      # If the whole layer is disabled, release any manual hold and stop.
+      - if:
+          - condition: state
+            entity_id: input_boolean.manual_overrides_enabled
+            state: "off"
+        then:
+          - if:
+              - condition: numeric_state
+                entity_id: input_number.active_override_priority
+                above: 0
+            then:
+              - action: script.release_manual_override
+                data:
+                  result: "⊘ disabled"
+          - stop: "manual layer disabled"
+      # Fetch events active right now.
+      - action: calendar.get_events
+        target:
+          entity_id: calendar.battery_overrides
+        data:
+          start_date_time: "{{ now() }}"
+          end_date_time: "{{ now() + timedelta(minutes=1) }}"
+        response_variable: agenda
+      - variables:
+          events: "{{ agenda['calendar.battery_overrides'].events | default([]) }}"
+          winner: >-
+            {% set ns = namespace(best={}, bp=-1, bs='') %}
+            {% for e in events if not e.summary.startswith('[OFF]') %}
+              {% set pr = (e.description | regex_findall('priority:\s*(\d+)') | first | default('1')) | int %}
+              {% set md = (e.description | regex_findall('mode:\s*(\w+)') | first | default('charge')) %}
+              {% if pr > ns.bp or (pr == ns.bp and e.start > ns.bs) %}
+                {% set ns.best = {'mode': md, 'priority': pr, 'until': e.end,
+                                  'owner': e.summary ~ ' @' ~ e.start} %}
+                {% set ns.bp = pr %}
+                {% set ns.bs = e.start %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.best }}
+      - choose:
+          # ---- A winning job exists ----
+          - conditions: "{{ winner.priority is defined }}"
+            sequence:
+              - variables:
+                  remaining: >-
+                    {{ [((as_datetime(winner.until) - now()).total_seconds() / 60) | int, 200] | min }}
+                  bridge_idle: >-
+                    {{ states('sensor.amber_bridge_ashqb71f39300081_active_override_value')
+                       in ['none','auto','selfconsume','unknown','unavailable',''] }}
+                  changed: "{{ winner.owner != states('input_text.active_override_owner') }}"
+              # Record the winner as the active hold (suppresses EMHASS).
+              - action: input_number.set_value
+                target: { entity_id: input_number.active_override_priority }
+                data: { value: "{{ winner.priority }}" }
+              - action: input_select.select_option
+                target: { entity_id: input_select.active_override_mode }
+                data: { option: "{{ winner.mode }}" }
+              - action: input_text.set_value
+                target: { entity_id: input_text.active_override_owner }
+                data: { value: "{{ winner.owner }}" }
+              - action: input_datetime.set_datetime
+                target: { entity_id: input_datetime.active_override_until }
+                data: { datetime: "{{ as_datetime(winner.until).strftime('%Y-%m-%d %H:%M:%S') }}" }
+              # (Re)apply to the bridge when the winner changed or the bridge
+              # has reverted (covers >200 min jobs and HA restarts).
+              - if: "{{ (changed or bridge_idle) and winner.mode != 'auto' and remaining > 0 }}"
+                then:
+                  - action: select.select_option
+                    target: { entity_id: select.amber_bridge_ashqb71f39300081_requested_mode }
+                    data: { option: "{{ winner.mode }}" }
+                  - action: number.set_value
+                    target: { entity_id: number.amber_bridge_ashqb71f39300081_requested_duration }
+                    data: { value: "{{ remaining }}" }
+                  - action: button.press
+                    target: { entity_id: button.amber_bridge_ashqb71f39300081_apply_override }
+                  - if: "{{ changed }}"
+                    then:
+                      - action: script.log_override
+                        data:
+                          mode: "{{ winner.mode }}"
+                          dur: "{{ remaining }}"
+                          prio: "{{ winner.priority }}"
+                          result: "✓ applied"
+        # ---- No job active: release back to EMHASS ----
+        default:
+          - if:
+              - condition: numeric_state
+                entity_id: input_number.active_override_priority
+                above: 0
+            then:
+              - action: script.release_manual_override
+                data:
+                  result: "✓ ended"
+
+  # Clear the manual hold and hand control back to EMHASS.
+  release_manual_override:
+    alias: Release Manual Override
+    icon: mdi:lock-open-variant
+    fields:
+      result:
+        description: history note
+        default: "✓ ended"
+    sequence:
+      - action: script.log_override
+        data:
+          mode: "{{ states('input_select.active_override_mode') }}"
+          dur: 0
+          prio: "{{ states('input_number.active_override_priority') }}"
+          result: "{{ result }}"
+      - action: input_number.set_value
+        target: { entity_id: input_number.active_override_priority }
+        data: { value: 0 }
+      - action: input_select.select_option
+        target: { entity_id: input_select.active_override_mode }
+        data: { option: none }
+      - action: input_text.set_value
+        target: { entity_id: input_text.active_override_owner }
+        data: { value: "" }
+      # Return the bridge to load-following promptly (guarded cancel).
+      - if:
+          - condition: template
+            value_template: >-
+              {{ states('sensor.amber_bridge_ashqb71f39300081_active_override_value')
+                 not in ['none','auto','selfconsume','unknown','unavailable',''] }}
+        then:
+          - action: button.press
+            target: { entity_id: button.amber_bridge_ashqb71f39300081_cancel_override }
+
+  # Append a compact record to the history ring buffer (keeps last 6).
+  log_override:
+    alias: Log Override
+    fields:
+      mode: { description: mode }
+      dur: { description: duration minutes }
+      prio: { description: priority }
+      result: { description: result note }
+    sequence:
+      - variables:
+          rec: "{{ now().strftime('%b %d %H:%M') }}  {{ mode }} {{ dur }}m p{{ prio }}  {{ result }}"
+      - action: input_text.set_value
+        target: { entity_id: input_text.manual_override_log }
+        data:
+          value: >-
+            {{ ([rec] + (states('input_text.manual_override_log') | from_json(default=[])))[:6] | to_json }}
+
+# -----------------------------------------------------------------------------
+# Automations
+# -----------------------------------------------------------------------------
+automation:
+  - alias: Manual Override - Coordinator tick
+    id: manual_override_coordinator_tick
+    description: Re-evaluate the winning override every minute, on start, and on calendar change.
+    trigger:
+      - platform: time_pattern
+        minutes: "*"
+      - platform: homeassistant
+        event: start
+      - platform: state
+        entity_id:
+          - calendar.battery_overrides
+          - input_boolean.manual_overrides_enabled
+    action:
+      - action: script.evaluate_manual_override
+    mode: single
+    max_exceeded: silent
+
+# -----------------------------------------------------------------------------
+# Display sensor (drives the dashboard list — read only)
+# -----------------------------------------------------------------------------
+template:
+  - trigger:
+      - platform: time_pattern
+        minutes: "/2"
+      - platform: homeassistant
+        event: start
+      - platform: state
+        entity_id: calendar.battery_overrides
+    action:
+      - action: calendar.get_events
+        target:
+          entity_id: calendar.battery_overrides
+        data:
+          start_date_time: "{{ now() }}"
+          end_date_time: "{{ now() + timedelta(days=14) }}"
+        response_variable: agenda
+    sensor:
+      - name: Battery Override Schedule
+        unique_id: battery_override_schedule
+        icon: mdi:calendar-clock
+        state: "{{ agenda['calendar.battery_overrides'].events | count }}"
+        attributes:
+          jobs: >-
+            {% set out = namespace(rows=[]) %}
+            {% for e in (agenda['calendar.battery_overrides'].events | default([]))[:12] %}
+              {% set paused = e.summary.startswith('[OFF]') %}
+              {% set md = (e.description | regex_findall('mode:\s*(\w+)') | first | default('?')) %}
+              {% set pr = (e.description | regex_findall('priority:\s*(\d+)') | first | default('?')) %}
+              {% set dur = ((as_datetime(e.end) - as_datetime(e.start)).total_seconds() / 60) | int %}
+              {% set out.rows = out.rows + [{
+                   'start': e.start, 'mode': md, 'priority': pr,
+                   'duration': dur, 'paused': paused }] %}
+            {% endfor %}
+            {{ out.rows }}
