@@ -24,6 +24,29 @@ input_boolean:
   manual_overrides_enabled:
     name: Manual Overrides Enabled
     icon: mdi:calendar-clock
+  # --- Charge guards / floor-charge (user toggles; all default off = inert) ---
+  charge_target_enabled:
+    name: Charge Target SoC Enabled
+    icon: mdi:battery-charging-90
+  import_ceiling_enabled:
+    name: Import Ceiling Price Enabled
+    icon: mdi:transmission-tower-import
+  floor_charge_enabled:
+    name: Floor Price Auto-Charge Enabled
+    icon: mdi:cash-minus
+  # --- Internal latches (written by coordinator; do not toggle by hand) ---
+  charge_target_latched:
+    name: Charge Target Latched
+    icon: mdi:lock-check
+  charge_veto_active:
+    name: Charge Veto Active
+    icon: mdi:hand-back-right
+  floor_charge_active:
+    name: Floor Charge Active
+    icon: mdi:flash-alert
+  ceiling_block_active:
+    name: Ceiling Block Active
+    icon: mdi:flash-off
 
 input_select:
   # --- Add-job form ---
@@ -72,12 +95,78 @@ input_number:
     max: 100
     step: 5
     mode: slider
+  override_form_target_soc:
+    name: Override Form Target SoC
+    icon: mdi:battery-charging-90
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    mode: slider
+  # --- Battery model for the "estimated SoC gain" preview (set once) ---
+  battery_usable_capacity_kwh:
+    name: Battery Usable Capacity
+    icon: mdi:battery-high
+    min: 0
+    max: 200
+    step: 0.5
+    unit_of_measurement: "kWh"
+    mode: box
+  assumed_charge_power_kw:
+    name: Assumed Grid Charge Power
+    icon: mdi:battery-charging-high
+    min: 0
+    max: 30
+    step: 0.1
+    unit_of_measurement: "kW"
+    mode: box
+    initial: 16
   active_override_priority:
     name: Active Override Priority
     icon: mdi:priority-high
     min: 0
     max: 100
     step: 1
+    mode: box
+  # --- Charge guards / floor-charge settings (defaults are inert) ---
+  charge_target_soc:
+    name: Charge Target SoC
+    icon: mdi:battery-charging-90
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    mode: slider
+  import_ceiling_price:
+    name: Import Ceiling Price
+    icon: mdi:transmission-tower-import
+    min: 0
+    max: 2
+    step: 0.01
+    unit_of_measurement: "$/kWh"
+    mode: box
+  import_floor_price:
+    name: Import Floor Price
+    icon: mdi:cash-minus
+    min: -1
+    max: 2
+    step: 0.01
+    unit_of_measurement: "$/kWh"
+    mode: box
+  floor_charge_priority:
+    name: Floor Charge Priority
+    icon: mdi:priority-high
+    min: 1
+    max: 100
+    step: 1
+    mode: box
+  price_deadband:
+    name: Price Deadband
+    icon: mdi:arrow-expand-vertical
+    min: 0
+    max: 0.2
+    step: 0.01
+    unit_of_measurement: "$/kWh"
     mode: box
 
 input_datetime:
@@ -96,9 +185,17 @@ input_text:
   active_override_owner:
     name: Active Override Owner
     max: 255
-  manual_override_log:
-    name: Manual Override Log
-    max: 255
+
+# Persistent history store (HACS "Variable" integration, rogro82).
+# restore: true keeps the records list across HA restarts.
+variable:
+  manual_override_history:
+    name: Manual Override History
+    icon: mdi:history
+    value: 0
+    attributes:
+      records: []
+    restore: true
 
 # -----------------------------------------------------------------------------
 # Scripts
@@ -113,8 +210,13 @@ script:
           mode: "{{ states('input_select.override_form_mode') }}"
           dur: "{{ states('input_number.override_form_duration') | int(30) }}"
           prio: "{{ states('input_number.override_form_priority') | int(50) }}"
+          tgt: "{{ states('input_number.override_form_target_soc') | int(0) }}"
           repeat: "{{ states('input_select.override_form_repeat') }}"
           start_dt: "{{ states('input_datetime.override_form_start') }}"
+          # Per-job target_soc line only when > 0 (0 = use global / no per-job target).
+          desc: >-
+            {{ 'mode: ' ~ mode ~ '\npriority: ' ~ prio
+               ~ (('\ntarget_soc: ' ~ tgt) if tgt > 0 else '') }}
           end_dt: >-
             {{ (as_datetime(states('input_datetime.override_form_start'))
                 + timedelta(minutes=states('input_number.override_form_duration') | int(30)))
@@ -132,7 +234,7 @@ script:
                   entity_id: calendar.battery_overrides
                 data:
                   summary: "Override: {{ mode }}"
-                  description: "mode: {{ mode }}\npriority: {{ prio }}"
+                  description: "{{ desc }}"
                   start_date_time: "{{ start_dt }}"
                   end_date_time: "{{ end_dt }}"
                   rrule: "{{ rrule }}"
@@ -142,9 +244,18 @@ script:
               entity_id: calendar.battery_overrides
             data:
               summary: "Override: {{ mode }}"
-              description: "mode: {{ mode }}\npriority: {{ prio }}"
+              description: "{{ desc }}"
               start_date_time: "{{ start_dt }}"
               end_date_time: "{{ end_dt }}"
+
+  # Reset the add-job form's start to the current date and time.
+  reset_override_form_now:
+    alias: Reset Override Form Start To Now
+    icon: mdi:clock-edit
+    sequence:
+      - action: input_datetime.set_datetime
+        target: { entity_id: input_datetime.override_form_start }
+        data: { datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}" }
 
   # Coordinator: decide the winning job and drive the Amber Bridge.
   evaluate_manual_override:
@@ -167,6 +278,32 @@ script:
                 data:
                   result: "⊘ disabled"
           - stop: "manual layer disabled"
+      # --- Price hysteresis latches (deadband stops minute-by-minute flapping) -
+      - variables:
+          price: "{{ states('sensor.amber_express_wilson_general_price') | float(999) }}"
+          deadband: "{{ states('input_number.price_deadband') | float(0) }}"
+          floor: "{{ states('input_number.import_floor_price') | float(-999) }}"
+          ceiling: "{{ states('input_number.import_ceiling_price') | float(999) }}"
+      # Floor-charge latch: on when price <= floor; off when price > floor + deadband.
+      - choose:
+          - conditions: "{{ is_state('input_boolean.floor_charge_enabled','on') and price <= floor }}"
+            sequence:
+              - action: input_boolean.turn_on
+                target: { entity_id: input_boolean.floor_charge_active }
+          - conditions: "{{ price > floor + deadband }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target: { entity_id: input_boolean.floor_charge_active }
+      # Ceiling-block latch: on when price >= ceiling; off when price < ceiling - deadband.
+      - choose:
+          - conditions: "{{ is_state('input_boolean.import_ceiling_enabled','on') and price >= ceiling }}"
+            sequence:
+              - action: input_boolean.turn_on
+                target: { entity_id: input_boolean.ceiling_block_active }
+          - conditions: "{{ price < ceiling - deadband }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target: { entity_id: input_boolean.ceiling_block_active }
       # Fetch events active right now.
       - action: calendar.get_events
         target:
@@ -182,13 +319,25 @@ script:
             {% for e in events if not e.summary.startswith('[OFF]') %}
               {% set pr = (e.description | regex_findall('priority:\s*(\d+)') | first | default('1')) | int %}
               {% set md = (e.description | regex_findall('mode:\s*(\w+)') | first | default('charge')) %}
+              {% set tgt = (e.description | regex_findall('target_soc:\s*(\d+)') | first | default('')) %}
+              {% set cl = (e.description | regex_findall('ceiling_price:\s*([0-9.]+)') | first | default('')) %}
               {% if pr > ns.bp or (pr == ns.bp and e.start > ns.bs) %}
                 {% set ns.best = {'mode': md, 'priority': pr, 'until': e.end,
-                                  'owner': e.summary ~ ' @' ~ e.start} %}
+                                  'owner': e.summary ~ ' @' ~ e.start,
+                                  'target': tgt, 'ceiling': cl} %}
                 {% set ns.bp = pr %}
                 {% set ns.bs = e.start %}
               {% endif %}
             {% endfor %}
+            {% if is_state('input_boolean.floor_charge_active','on') %}
+              {% set fp = states('input_number.floor_charge_priority') | int(1) %}
+              {% if fp > ns.bp %}
+                {% set ns.best = {'mode': 'charge', 'priority': fp,
+                                  'until': (now() + timedelta(minutes=15)).isoformat(),
+                                  'owner': 'FLOOR-CHARGE', 'target': '', 'ceiling': ''} %}
+                {% set ns.bp = fp %}
+              {% endif %}
+            {% endif %}
             {{ ns.best }}
       - choose:
           # ---- A winning job exists ----
@@ -201,6 +350,33 @@ script:
                     {{ states('sensor.amber_bridge_ashqb71f39300081_active_override_value')
                        in ['none','auto','selfconsume','unknown','unavailable',''] }}
                   changed: "{{ winner.owner != states('input_text.active_override_owner') }}"
+                  soc_raw: "{{ states('sensor.x1_h8k_host_state_of_charge') }}"
+                  soc_known: "{{ soc_raw not in ['unknown','unavailable','','None'] }}"
+                  soc: "{{ soc_raw | float(0) }}"
+                  # Per-job override beats global; absent → global (gated by toggle).
+                  target_active: >-
+                    {{ winner.target not in ['', none]
+                       or is_state('input_boolean.charge_target_enabled','on') }}
+                  eff_target: >-
+                    {{ (winner.target | float(100)) if winner.target not in ['', none]
+                       else (states('input_number.charge_target_soc') | float(100)) }}
+                  ceiling_block: >-
+                    {{ (price >= (winner.ceiling | float(999)))
+                       if winner.ceiling not in ['', none]
+                       else is_state('input_boolean.ceiling_block_active','on') }}
+                  # One-shot target latch resets on a new winner.
+                  latched_eff: >-
+                    {{ is_state('input_boolean.charge_target_latched','on')
+                       and winner.owner == states('input_text.active_override_owner') }}
+                  target_hit_now: "{{ target_active and soc_known and (soc | float(0)) >= (eff_target | float(100)) }}"
+                  veto: >-
+                    {{ winner.mode == 'charge' and (
+                         (ceiling_block | bool)
+                         or ((target_active | bool)
+                             and ((not (soc_known | bool))
+                                  or (latched_eff | bool)
+                                  or ((soc | float(0)) >= (eff_target | float(100))))) ) }}
+                  veto_changed: "{{ (veto | bool) != is_state('input_boolean.charge_veto_active','on') }}"
               # Record the winner as the active hold (suppresses EMHASS).
               - action: input_number.set_value
                 target: { entity_id: input_number.active_override_priority }
@@ -214,26 +390,61 @@ script:
               - action: input_datetime.set_datetime
                 target: { entity_id: input_datetime.active_override_until }
                 data: { datetime: "{{ as_datetime(winner.until).strftime('%Y-%m-%d %H:%M:%S') }}" }
-              # (Re)apply to the bridge when the winner changed or the bridge
-              # has reverted (covers >200 min jobs and HA restarts).
-              - if: "{{ (changed or bridge_idle) and winner.mode != 'auto' and remaining > 0 }}"
+              # One-shot target latch: reset on new winner, then set if target met.
+              - if: "{{ changed }}"
                 then:
-                  - action: select.select_option
-                    target: { entity_id: select.amber_bridge_ashqb71f39300081_requested_mode }
-                    data: { option: "{{ winner.mode }}" }
-                  - action: number.set_value
-                    target: { entity_id: number.amber_bridge_ashqb71f39300081_requested_duration }
-                    data: { value: "{{ remaining }}" }
-                  - action: button.press
-                    target: { entity_id: button.amber_bridge_ashqb71f39300081_apply_override }
-                  - if: "{{ changed }}"
+                  - action: input_boolean.turn_off
+                    target: { entity_id: input_boolean.charge_target_latched }
+              - if: "{{ winner.mode == 'charge' and target_hit_now }}"
+                then:
+                  - action: input_boolean.turn_on
+                    target: { entity_id: input_boolean.charge_target_latched }
+              # Stop-guards veto a charge → release to load-following; else apply.
+              - choose:
+                  - conditions: "{{ veto | bool }}"
+                    sequence:
+                      - if:
+                          - condition: template
+                            value_template: >-
+                              {{ states('sensor.amber_bridge_ashqb71f39300081_active_override_value')
+                                 not in ['none','auto','selfconsume','unknown','unavailable',''] }}
+                        then:
+                          - action: button.press
+                            target: { entity_id: button.amber_bridge_ashqb71f39300081_cancel_override }
+                      - if: "{{ veto_changed }}"
+                        then:
+                          - action: script.log_override
+                            data:
+                              mode: "{{ winner.mode }}"
+                              dur: 0
+                              prio: "{{ winner.priority }}"
+                              result: >-
+                                ⛔ veto ({{ 'price' if (ceiling_block | bool)
+                                  else ('soc?' if not (soc_known | bool) else 'target') }})
+                      - action: input_boolean.turn_on
+                        target: { entity_id: input_boolean.charge_veto_active }
+                default:
+                  # (Re)apply when winner changed, guard just cleared, or bridge reverted.
+                  - if: "{{ (changed or veto_changed or bridge_idle) and winner.mode != 'auto' and remaining > 0 }}"
                     then:
-                      - action: script.log_override
-                        data:
-                          mode: "{{ winner.mode }}"
-                          dur: "{{ remaining }}"
-                          prio: "{{ winner.priority }}"
-                          result: "✓ applied"
+                      - action: select.select_option
+                        target: { entity_id: select.amber_bridge_ashqb71f39300081_requested_mode }
+                        data: { option: "{{ winner.mode }}" }
+                      - action: number.set_value
+                        target: { entity_id: number.amber_bridge_ashqb71f39300081_requested_duration }
+                        data: { value: "{{ remaining }}" }
+                      - action: button.press
+                        target: { entity_id: button.amber_bridge_ashqb71f39300081_apply_override }
+                      - if: "{{ changed or veto_changed }}"
+                        then:
+                          - action: script.log_override
+                            data:
+                              mode: "{{ winner.mode }}"
+                              dur: "{{ remaining }}"
+                              prio: "{{ winner.priority }}"
+                              result: "✓ applied"
+                  - action: input_boolean.turn_off
+                    target: { entity_id: input_boolean.charge_veto_active }
         # ---- No job active: release back to EMHASS ----
         default:
           - if:
@@ -269,6 +480,12 @@ script:
       - action: input_text.set_value
         target: { entity_id: input_text.active_override_owner }
         data: { value: "" }
+      # Clear charge-guard latches so the next winner starts clean.
+      - action: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.charge_target_latched
+            - input_boolean.charge_veto_active
       # Return the bridge to load-following promptly (guarded cancel).
       - if:
           - condition: template
@@ -279,9 +496,12 @@ script:
           - action: button.press
             target: { entity_id: button.amber_bridge_ashqb71f39300081_cancel_override }
 
-  # Append a compact record to the history ring buffer (keeps last 6).
+  # Prepend a structured record to the persistent history (last 20). SoC % and
+  # import $/kWh are read here so callers needn't pass them. queued so rapid
+  # release+apply calls append in order without racing the read-modify-write.
   log_override:
     alias: Log Override
+    mode: queued
     fields:
       mode: { description: mode }
       dur: { description: duration minutes }
@@ -289,12 +509,23 @@ script:
       result: { description: result note }
     sequence:
       - variables:
-          rec: "{{ now().strftime('%b %d %H:%M') }}  {{ mode }} {{ dur }}m p{{ prio }}  {{ result }}"
-      - action: input_text.set_value
-        target: { entity_id: input_text.manual_override_log }
+          new_rec:
+            ts: "{{ now().strftime('%b %d %H:%M') }}"
+            mode: "{{ mode }}"
+            dur: "{{ dur }}"
+            prio: "{{ prio }}"
+            soc: "{{ states('sensor.x1_h8k_host_state_of_charge') | int(0) }}"
+            price: "{{ states('sensor.amber_express_wilson_general_price') | float(0) | round(2) }}"
+            result: "{{ result }}"
+          new_records: >-
+            {{ ([new_rec]
+                + (state_attr('variable.manual_override_history', 'records') | default([])))[:20] }}
+      - action: variable.set_variable
         data:
-          value: >-
-            {{ ([rec] + (states('input_text.manual_override_log') | from_json(default=[])))[:6] | to_json }}
+          variable: manual_override_history
+          value: "{{ new_records | count }}"
+          replace_attributes: true
+          attributes_template: "{{ {'records': new_records} }}"
 
 # -----------------------------------------------------------------------------
 # Automations
@@ -318,7 +549,7 @@ automation:
     max_exceeded: silent
 
 # -----------------------------------------------------------------------------
-# Display sensor (drives the dashboard list — read only)
+# Display sensors (drive the dashboard lists — read only)
 # -----------------------------------------------------------------------------
 template:
   - trigger:

@@ -1,0 +1,185 @@
+type: vertical-stack
+cards:
+  - type: custom:mushroom-title-card
+    title: Battery Override Scheduler
+  - type: custom:mushroom-template-card
+    primary: >-
+      {% if states('input_number.active_override_priority') | int(0) > 0 %}
+      MANUAL: {{ states('input_select.active_override_mode') }} - prio {{
+      states('input_number.active_override_priority') | int }} {% else %}EMHASS
+      in control{% endif %}
+    secondary: >-
+      {% if states('input_number.active_override_priority') | int(0) > 0 %} ends
+      {{ as_timestamp(states('input_datetime.active_override_until'), 0) |
+      timestamp_custom('%a %H:%M', true) }} - {{
+      states('input_text.emhass_battery_status') }} {% else %}{{
+      states('input_text.emhass_battery_status') }}{% endif %}
+    icon: >-
+      {% set m = states('input_select.active_override_mode') %} {% if m ==
+      'charge' %}mdi:battery-charging {% elif m == 'discharge'
+      %}mdi:battery-arrow-down {% elif m == 'preserve' %}mdi:battery-lock {%
+      else %}mdi:home-lightning-bolt{% endif %}
+    color: >-
+      {% if states('input_number.active_override_priority') | int(0) > 0
+      %}orange {% else %}green{% endif %}
+    features_position: bottom
+  - type: custom:mushroom-entity-card
+    entity: input_boolean.manual_overrides_enabled
+    name: Manual overrides
+    icon: mdi:calendar-check
+    tap_action:
+      action: toggle
+  - type: custom:mushroom-title-card
+    subtitle: Schedule a new override
+  - type: entities
+    show_header_toggle: false
+    entities:
+      - entity: input_select.override_form_mode
+        name: Mode
+      - entity: input_datetime.override_form_start
+        name: Start
+      - entity: input_number.override_form_duration
+        name: Duration
+      - entity: input_number.override_form_target_soc
+        name: Target SoC (0 = use global)
+      - entity: input_number.override_form_priority
+        name: Priority
+      - entity: input_select.override_form_repeat
+        name: Repeat
+      - type: custom:mushroom-template-card
+        primary: >-
+          {% set mode = states('input_select.override_form_mode') %} {% set dur
+          = states('input_number.override_form_duration') | float(0) %} {% set
+          pwr = states('input_number.assumed_charge_power_kw') | float(0) %} {%
+          set cap = states('input_number.battery_usable_capacity_kwh') |
+          float(0) %} {% set cur = states('sensor.x1_h8k_host_state_of_charge')
+          | float(0) %} {% set tgt =
+          states('input_number.override_form_target_soc') | float(0) %} {% if
+          mode != 'charge' %}Estimate (charge mode only) {% elif cap <= 0 or pwr
+          <= 0 %}Set capacity + charge power below {% else %} {% set gain = (pwr
+          * dur / 60) / cap * 100 %} {% set final = [cur + gain, 100] | min %}
+          {% set final = ([final, tgt] | min) if tgt > 0 else final %} +{{ gain
+          | round(0) | int }}% SoC  ->  {{ final | round(0) | int }}% final {%
+          endif %}
+        secondary: >-
+          {% set mode = states('input_select.override_form_mode') %} {% set dur
+          = states('input_number.override_form_duration') | float(0) %} {% set
+          pwr = states('input_number.assumed_charge_power_kw') | float(0) %} {%
+          set cur = states('sensor.x1_h8k_host_state_of_charge') | float(0) %}
+          {% set tgt = states('input_number.override_form_target_soc') |
+          float(0) %} {% if mode == 'charge' and pwr > 0 %} from {{ cur |
+          round(0) | int }}% · {{ dur | int }} min @ {{ pwr }} kW = {{ (pwr *
+          dur / 60) | round(1) }} kWh{{ ' · capped at target ' ~ (tgt | int) ~
+          '%' if tgt > 0 else '' }} {% else %}Projection assumes constant charge
+          power; actual limited by ceiling/target{% endif %}
+        icon: mdi:battery-charging-medium
+        color: green
+        features_position: bottom
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-template-card
+        primary: Set start to now
+        secondary: Reset start to current date and time
+        icon: mdi:clock-edit
+        icon_color: blue
+        tap_action:
+          action: call-service
+          service: script.reset_override_form_now
+      - type: custom:mushroom-template-card
+        primary: Add to schedule
+        secondary: Creates the calendar job
+        icon: mdi:calendar-plus
+        icon_color: blue
+        tap_action:
+          action: call-service
+          service: script.create_override_job
+  - type: custom:mushroom-title-card
+    subtitle: Charge guards & floor-price auto-charge
+  - type: custom:mushroom-template-card
+    primary: >-
+      Import {{ states('sensor.amber_express_wilson_general_price') }} $/kWh -
+      SoC {{ states('sensor.x1_h8k_host_state_of_charge') }}%
+    secondary: >-
+      {% if is_state('input_boolean.charge_veto_active','on') %}Charge vetoed
+      (stop-guard) {% elif is_state('input_boolean.floor_charge_active','on')
+      %}Floor auto-charge active {% else %}Guards idle{% endif %}
+    icon: >-
+      {% if is_state('input_boolean.charge_veto_active','on')
+      %}mdi:hand-back-right {% elif
+      is_state('input_boolean.floor_charge_active','on') %}mdi:flash {% else
+      %}mdi:shield-check{% endif %}
+    icon_color: >-
+      {% if is_state('input_boolean.charge_veto_active','on') %}red {% elif
+      is_state('input_boolean.floor_charge_active','on') %}green {% else
+      %}grey{% endif %}
+  - type: entities
+    show_header_toggle: false
+    entities:
+      - type: section
+        label: Target charge level (stop)
+      - entity: input_boolean.charge_target_enabled
+        name: Enable target stop
+      - entity: input_number.charge_target_soc
+        name: Target SoC
+      - type: section
+        label: Ceiling import price (stop)
+      - entity: input_boolean.import_ceiling_enabled
+        name: Enable ceiling stop
+      - entity: input_number.import_ceiling_price
+        name: Ceiling price
+      - type: section
+        label: Floor import price (auto-charge)
+      - entity: input_boolean.floor_charge_enabled
+        name: Enable floor auto-charge
+      - entity: input_number.import_floor_price
+        name: Floor price
+      - entity: input_number.floor_charge_priority
+        name: Floor charge priority
+      - type: section
+        label: Common
+      - entity: input_number.price_deadband
+        name: Price deadband
+  - type: custom:mushroom-title-card
+    subtitle: Scheduled overrides
+  - type: markdown
+    content: >
+      {% set jobs = state_attr('sensor.battery_override_schedule', 'jobs') or []
+      %} {% if jobs | count == 0 %}_No upcoming overrides._ {% else %}| When |
+      Mode | Dur | Prio | State |
+
+      |---|---|--:|--:|:--:|
+
+      {% for j in jobs %}| {{ as_timestamp(j.start, 0) | timestamp_custom('%a %d
+      %b %H:%M', true) }} | {{ j.mode }} | {{ j.duration }}m | {{ j.priority }}
+      | {{ 'paused' if j.paused else 'armed' }} |
+
+      {% endfor %}{% endif %}
+
+      _Tap an event in the calendar below to edit or delete it._
+  - type: calendar
+    initial_view: listWeek
+    entities:
+      - calendar.battery_overrides
+  - type: custom:mushroom-title-card
+    subtitle: Recently executed
+  - type: markdown
+    content: >
+      {% set log = state_attr('variable.manual_override_history', 'records') or
+      [] %} {% if log | count == 0 %}_No history yet._ {% else %}| Time | Mode |
+      Dur | Prio | SoC | $/kWh | Result |
+
+      |---|---|--:|--:|--:|--:|:--|
+
+      {% for r in log %}| {{ r.ts }} | {{ r.mode }} | {{ r.dur }}m | {{ r.prio
+      }} | {{ r.soc }}% | {{ r.price }} | {{ r.result }} |
+
+      {% endfor %}{% endif %}
+  - type: entities
+    show_header_toggle: false
+    entities:
+      - type: section
+        label: Battery model (for the estimate above)
+      - entity: input_number.battery_usable_capacity_kwh
+        name: Usable capacity
+      - entity: input_number.assumed_charge_power_kw
+        name: Grid charge power
