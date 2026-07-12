@@ -1,0 +1,79 @@
+# Envoy live power card — paste into a dashboard (Mushroom required).
+# Shows the real-time flows from packages/envoy.yaml, with the Anker-corrected
+# true house consumption alongside the raw Envoy load meter.
+type: vertical-stack
+cards:
+  - type: markdown
+    content: >
+      ### ⚡ Live Power  ·  <ha-icon icon="mdi:lan-connect"></ha-icon>
+      {{ states('sensor.envoy_connection_state') }}
+
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: custom:mushroom-template-card
+        primary: Solar
+        secondary: "{{ states('sensor.envoy_pv_power') }} W"
+        icon: mdi:solar-power
+        icon_color: amber
+        tap_action:
+          action: more-info
+        entity: sensor.envoy_pv_power
+
+      - type: custom:mushroom-template-card
+        primary: >-
+          {{ 'Grid Import' if states('sensor.envoy_grid_power')|float(0) >= 0 else 'Grid Export' }}
+        secondary: "{{ states('sensor.envoy_grid_power')|float(0)|abs|round(0) }} W"
+        icon: mdi:transmission-tower
+        icon_color: "{{ 'red' if states('sensor.envoy_grid_power')|float(0) >= 0 else 'green' }}"
+        entity: sensor.envoy_grid_power
+
+      - type: custom:mushroom-template-card
+        primary: House
+        secondary: "{{ states('sensor.true_house_consumption') }} W"
+        icon: mdi:home-lightning-bolt
+        icon_color: blue
+        entity: sensor.true_house_consumption
+
+      - type: custom:mushroom-template-card
+        primary: >-
+          {% set c = states('sensor.anker_battery_charge_power')|float(0) %}
+          {% set d = states('sensor.anker_battery_discharge_power')|float(0) %}
+          {{ 'Battery Charge' if c >= d else 'Battery Discharge' }}
+        secondary: >-
+          {% set c = states('sensor.anker_battery_charge_power')|float(0) %}
+          {% set d = states('sensor.anker_battery_discharge_power')|float(0) %}
+          {{ (c - d)|abs|round(0) }} W · {{ states('sensor.solix_battery_soc') }}%
+        icon: mdi:battery-charging
+        icon_color: "{{ 'green' if states('sensor.anker_battery_charge_power')|float(0) >= states('sensor.anker_battery_discharge_power')|float(0) else 'orange' }}"
+        entity: sensor.solix_battery_soc
+
+  - type: custom:mushroom-template-card
+    primary: Envoy load meter (raw · incl. battery charging)
+    secondary: "{{ states('sensor.envoy_load_power') }} W"
+    icon: mdi:gauge
+    icon_color: grey
+    entity: sensor.envoy_load_power
+
+  - type: custom:apexcharts-card
+    header:
+      show: true
+      title: Power flow (last 30 min)
+    graph_span: 30min
+    update_interval: 5s
+    yaxis:
+      - min: ~0
+    series:
+      - entity: sensor.envoy_pv_power
+        name: Solar
+        color: "#f5a623"
+        stroke_width: 2
+      - entity: sensor.true_house_consumption
+        name: House
+        color: "#4a90e2"
+        stroke_width: 2
+      - entity: sensor.envoy_grid_power
+        name: Grid
+        color: "#d0021b"
+        stroke_width: 2

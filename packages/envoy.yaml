@@ -1,0 +1,128 @@
+# =============================================================================
+# Enphase Envoy-S / IQ Gateway Metered — live status package
+# -----------------------------------------------------------------------------
+# Device: 10.0.1.117  (SN 122206102804, fw D8.3.5528)
+# Auth:   token-based. Store the JWT in secrets.yaml as:
+#           envoy_api_token: "Bearer eyJ..."
+#
+# Fast loop (<5s): /ivp/livedata/status polled every 3s. This endpoint only
+# streams at ~1Hz while the live stream is enabled, so an automation re-arms it
+# on HA start and every 10 min (it auto-disables on Envoy reboot/idle).
+#
+# NOTE ON "LOAD": the Anker Solix is AC-coupled and invisible to the Envoy
+# (storage CT disabled, ensemble empty). The Envoy meters Anker charging as
+# consumption, so:
+#     Envoy load = true house + Anker charge - Anker discharge
+# True house consumption is reconstructed below using the Anker MQTT flows.
+# =============================================================================
+
+rest:
+  # ---- Fast loop: real-time power flows (<5s) --------------------------------
+  - resource: https://10.0.1.117/ivp/livedata/status
+    scan_interval: 3
+    verify_ssl: false
+    timeout: 8
+    headers:
+      Authorization: !secret envoy_api_token
+    sensor:
+      - name: "Envoy PV Power"
+        unique_id: envoy_pv_power
+        value_template: "{{ (value_json.meters.pv.agg_p_mw | float(0) / 1000) | round(0) }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: "Envoy Grid Power"        # + = importing, - = exporting
+        unique_id: envoy_grid_power
+        value_template: "{{ (value_json.meters.grid.agg_p_mw | float(0) / 1000) | round(0) }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: "Envoy Load Power"        # raw meter = house + Anker charging
+        unique_id: envoy_load_power
+        value_template: "{{ (value_json.meters.load.agg_p_mw | float(0) / 1000) | round(0) }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: "Envoy Connection State"
+        unique_id: envoy_connection_state
+        value_template: "{{ value_json.connection.mqtt_state }}"
+        icon: mdi:lan-connect
+
+  # ---- Slow loop: reliable daily/lifetime energy (CT whToday is broken) ------
+  - resource: https://10.0.1.117/ivp/pdm/energy
+    scan_interval: 60
+    verify_ssl: false
+    timeout: 10
+    headers:
+      Authorization: !secret envoy_api_token
+    sensor:
+      - name: "Envoy Solar Today"
+        unique_id: envoy_solar_today
+        value_template: "{{ (value_json.production.pcu.wattHoursToday | float(0) / 1000) | round(2) }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: "Envoy Solar Lifetime"
+        unique_id: envoy_solar_lifetime
+        value_template: "{{ (value_json.production.eim.wattHoursLifetime | float(0) / 1000) | round(1) }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+
+# ---- Keep the 1Hz live stream enabled ---------------------------------------
+rest_command:
+  envoy_enable_stream:
+    url: https://10.0.1.117/ivp/livedata/stream
+    method: POST
+    verify_ssl: false
+    content_type: "application/json"
+    headers:
+      Authorization: !secret envoy_api_token
+    payload: '{"enable":1}'
+
+automation:
+  - alias: "Envoy - keep livedata stream enabled"
+    id: envoy_keep_livedata_stream
+    trigger:
+      - platform: homeassistant
+        event: start
+      - platform: time_pattern
+        minutes: "/10"
+    action:
+      - service: rest_command.envoy_enable_stream
+
+# ---- Anker-corrected derived sensors ----------------------------------------
+template:
+  - sensor:
+      # Total power flowing INTO the battery (charging)
+      - name: "Anker Battery Charge Power"
+        unique_id: anker_battery_charge_power
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        state: >
+          {{ (states('sensor.solix_pv_to_battery_power')   | float(0)
+            + states('sensor.solix_grid_to_battery_power') | float(0)) | round(0) }}
+
+      # Total power flowing OUT of the battery (discharging)
+      - name: "Anker Battery Discharge Power"
+        unique_id: anker_battery_discharge_power
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        state: >
+          {{ (states('sensor.solix_battery_to_home_power') | float(0)
+            + states('sensor.solix_battery_to_grid_power') | float(0)) | round(0) }}
+
+      # True house consumption = Envoy load - Anker charge + Anker discharge
+      - name: "True House Consumption"
+        unique_id: true_house_consumption
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        availability: "{{ states('sensor.envoy_load_power') not in ['unknown','unavailable'] }}"
+        state: >
+          {% set load = states('sensor.envoy_load_power')            | float(0) %}
+          {% set chg  = states('sensor.anker_battery_charge_power')  | float(0) %}
+          {% set dis  = states('sensor.anker_battery_discharge_power') | float(0) %}
+          {{ [0, (load - chg + dis)] | max | round(0) }}
