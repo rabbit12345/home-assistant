@@ -87,76 +87,11 @@ sql:
     unit_of_measurement: "kWh"
     device_class: energy
 
-sensor:
-  - platform: rest
-    resource: https://10.0.1.117/ivp/meters/readings
-    name: Power Solar Production
-    force_update: true
-    unique_id: power_solar_production_id
-    scan_interval: 10
-    value_template: "{{ value_json[0].activePower | float(0) }}"
-    headers:
-      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxODEwMzM1NjU2LCJpYXQiOjE3Nzg3OTk2NTYsImp0aSI6IjgzODJlZjJmLWNjYWMtNDk5My05ZDMwLWU0ZjY3MDc1ZWUxNSIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.9ERcqyTbxWktuGI052JxuGlZXuBRGPaxBM-PkF53ujh3UGvr00BcPK9QsCD6buEo9yzlgbi1fKj0TffIuR6fZQ
-    verify_ssl: False
-    state_class: measurement
-    device_class: power
-    unit_of_measurement: W
-    json_attributes_path: "$.[0]"
-    json_attributes:
-      - "eid"
-      - "apparentPower"
-      - "timestamp"
-      - "voltage"
-      - "current"
-      - "freq"
-
-  - platform: rest
-    name: Power House Consumption
-    unique_id: power_house_consumption_id
-    resource: "https://10.0.1.117/ivp/meters/reports/consumption"
-    method: GET
-    force_update: true
-    scan_interval: 10
-    value_template: "{{ value_json[0].cumulative.actPower | float(0) }}"
-    headers:
-      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxODEwMzM1NjU2LCJpYXQiOjE3Nzg3OTk2NTYsImp0aSI6IjgzODJlZjJmLWNjYWMtNDk5My05ZDMwLWU0ZjY3MDc1ZWUxNSIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.9ERcqyTbxWktuGI052JxuGlZXuBRGPaxBM-PkF53ujh3UGvr00BcPK9QsCD6buEo9yzlgbi1fKj0TffIuR6fZQ
-    verify_ssl: False
-    state_class: measurement
-    device_class: power
-    unit_of_measurement: W
-    json_attributes_path: "$.[1].cumulative"
-    json_attributes:
-      - "currW"
-      - "apprntPwr"
-      - "whDlvdCum"
-      - "rmsVoltage"
-      - "rmsCurrent"
-
-  - platform: rest
-    resource: https://10.0.1.117/ivp/meters/reports/consumption
-    name: Power Net Consumption
-    force_update: true
-    unique_id: power_net_consumption_id
-    scan_interval: 10
-    value_template: "{{ value_json[1].cumulative.actPower | float(0) }}"
-    headers:
-      Authorization: Bearer eyJraWQiOiI3ZDEwMDA1ZC03ODk5LTRkMGQtYmNiNC0yNDRmOThlZTE1NmIiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiIxMjIyMDYxMDI4MDQiLCJpc3MiOiJFbnRyZXoiLCJlbnBoYXNlVXNlciI6Im93bmVyIiwiZXhwIjoxODEwMzM1NjU2LCJpYXQiOjE3Nzg3OTk2NTYsImp0aSI6IjgzODJlZjJmLWNjYWMtNDk5My05ZDMwLWU0ZjY3MDc1ZWUxNSIsInVzZXJuYW1lIjoiamF5QHBvd2VydW4uY29tIn0.9ERcqyTbxWktuGI052JxuGlZXuBRGPaxBM-PkF53ujh3UGvr00BcPK9QsCD6buEo9yzlgbi1fKj0TffIuR6fZQ
-    verify_ssl: False
-    state_class: measurement
-    device_class: power
-    unit_of_measurement: W
-    json_attributes_path: "$.[1].cumulative"
-    json_attributes:
-      - "currW"
-      - "apprntPwr"
-      - "whDlvdCum"
-      - "rmsVoltage"
-      - "rmsCurrent"
-      
+sensor:      
   - platform: integration
     name: Energy Solar Production
     unique_id: energy_solar_production_id
-    source: sensor.power_solar_production
+    source: sensor.envoy_pv_power
     unit_time: h
     unit_prefix: k
     method: left
@@ -164,23 +99,7 @@ sensor:
   - platform: integration
     name: Energy House Consumption
     unique_id: energy_house_consumption_id
-    source: sensor.power_house_consumption
-    unit_time: h
-    unit_prefix: k
-    method: left
-
-  - platform: integration
-    name: Energy Net To Grid
-    unique_id: energy_net_to_grid_id
-    source: sensor.power_net_to_grid
-    unit_time: h
-    unit_prefix: k
-    method: left
-
-  - platform: integration
-    name: Energy Net From Grid
-    unique_id: energy_net_from_grid_id
-    source: sensor.power_net_from_grid
+    source: sensor.solix_home_demand_2
     unit_time: h
     unit_prefix: k
     method: left
@@ -231,61 +150,28 @@ sensor:
     max_age:
       minutes: 1
       
-  # AUBURN COSTCO petrol price via Scrape
-  - platform: scrape
-    resource: https://fuelradar.com.au/map/station/437aa5eea143da5dd19defc3
-    name: Costco Auburn E10
-    select: "#app"
-    attribute: data-page
-    value_template: >
-      {% set data = value | from_json %}
-      {% for p in data.props.stationData.Prices if p.Code == 'E10' %}
-        {{ p.Price | float / 10 }}
-      {% endfor %}
-    unit_of_measurement: "c/L"
-    scan_interval: 3600
+  # AUBURN COSTCO petrol price - disabled: site migrated from Inertia (data-page) to Next.js (__NEXT_DATA__), use command_line sensors below
 
 command_line:
   - sensor:
       name: Costco Auburn P98
       unique_id: costco_auburn_p98
       scan_interval: 3600
-      command: >-
-        curl -s -L --compressed
-        -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        -H "Accept-Language: en-AU,en;q=0.9"
-        -H "Accept-Encoding: gzip, deflate, br"
-        "https://fuelradar.com.au/map/station/437aa5eea143da5dd19defc3"
-        | python3 -c "import sys,json,re;html=sys.stdin.read();m=re.search(r'data-page=\"(.*?)\"',html);data=json.loads(m.group(1).replace('&quot;','\"')) if m else {};prices=data.get('props',{}).get('stationData',{}).get('Prices',[]);p98=next((p for p in prices if p['Code']=='P98'),None);print(p98['Price']/10 if p98 else '')"
+      command: python3 /config/fuel_price.py P98
       unit_of_measurement: "c/L"
 
   - sensor:
       name: Costco Auburn E10
       unique_id: costco_auburn_e10
       scan_interval: 3600
-      command: >-
-        curl -s -L --compressed
-        -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        -H "Accept-Language: en-AU,en;q=0.9"
-        -H "Accept-Encoding: gzip, deflate, br"
-        "https://fuelradar.com.au/map/station/437aa5eea143da5dd19defc3"
-        | python3 -c "import sys,json,re;html=sys.stdin.read();m=re.search(r'data-page=\"(.*?)\"',html);data=json.loads(m.group(1).replace('&quot;','\"')) if m else {};prices=data.get('props',{}).get('stationData',{}).get('Prices',[]);e10=next((p for p in prices if p['Code']=='E10'),None);print(e10['Price']/10 if e10 else '')"
+      command: python3 /config/fuel_price.py E10
       unit_of_measurement: "c/L"
 
   - sensor:
       name: Costco Auburn Diesel
       unique_id: costco_auburn_diesel
       scan_interval: 3600
-      command: >-
-        curl -s -L --compressed
-        -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        -H "Accept-Language: en-AU,en;q=0.9"
-        -H "Accept-Encoding: gzip, deflate, br"
-        "https://fuelradar.com.au/map/station/437aa5eea143da5dd19defc3"
-        | python3 -c "import sys,json,re;html=sys.stdin.read();m=re.search(r'data-page=\"(.*?)\"',html);data=json.loads(m.group(1).replace('&quot;','\"')) if m else {};prices=data.get('props',{}).get('stationData',{}).get('Prices',[]);pdsl=next((p for p in prices if p['Code']=='PDSL'),None);print(pdsl['Price']/10 if pdsl else '')"
+      command: python3 /config/fuel_price.py Diesel
       unit_of_measurement: "c/L"
 
       

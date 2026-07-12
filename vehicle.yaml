@@ -1,0 +1,133 @@
+type: horizontal-stack
+cards:
+  - type: vertical-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: scene.garage_open_garage_door
+        name: Garage open
+        icon: mdi:garage-open-variant
+        layout: horizontal
+        fill_container: false
+        primary_info: name
+        secondary_info: last-changed
+        tap_action:
+          action: toggle
+      - type: custom:mushroom-template-card
+        primary: driveway gate
+        entity: binary_sensor.driveway_gate_sensor_door
+        secondary: >
+          {% set motion_state=states('binary_sensor.driveway_gate_sensor_door')
+          %} {% if motion_state=='on' %} open {% else %} closed {% endif %} |
+          {{relative_time(states.binary_sensor.driveway_gate_sensor_door.last_changed)}}
+        icon: |
+          {% set sensor_state=states(entity) %}
+          {% if sensor_state=='on'%}
+          mdi:gate-open
+          {% else %}
+          mdi:gate
+          {% endif %}
+        icon_color: |
+          {% set sensor_state=states(entity) %}
+          {% if sensor_state=='on'%}
+          red
+          {% else %}
+          green
+          {% endif %}
+        tap_action:
+          action: none
+        hold_action:
+          action: more-info
+        multiline_secondary: true
+      - type: custom:mushroom-entity-card
+        entity: sensor.eei12e_fuel_level
+        name: C300 Fuel
+      - type: custom:mushroom-entity-card
+        entity: sensor.eei12e_range_liquid
+        name: C300 Range
+        icon: mdi:counter
+      - type: custom:mushroom-template-card
+        primary: C300 Fill Cost
+        entity: input_number.petrol_price_to_add_c300
+        secondary: >
+          P98: {{ states('sensor.costco_auburn_p98') | float(0) }} c/L
+        icon: mdi:gas-station
+        icon_color: >
+          {% set level = states('sensor.eei12e_fuel_level') | float(0) %}
+          {% if level < 25 %}red{% elif level < 50 %}orange{% else %}green{% endif %}
+        badge_icon: >
+          {% if states('sensor.costco_auburn_p98') == 'unavailable' %}mdi:alert{% endif %}
+        tap_action:
+          action: more-info
+        hold_action:
+          action: more-info
+      - type: custom:mushroom-lock-card
+        entity: lock.eei12e_lock
+        fill_container: false
+        name: C300
+        hold_action:
+          action: more-info
+  - type: vertical-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: scene.garage_close_garage_door
+        name: Garage close
+        icon: mdi:garage-variant-lock
+        primary_info: name
+        secondary_info: last-updated
+        icon_type: entity-picture
+        tap_action:
+          action: toggle      
+      - type: custom:mushroom-template-card
+        primary: garage door
+        entity: binary_sensor.garage_garage_door_sensor_2225
+        secondary: >
+          {% set
+          motion_state=states('binary_sensor.garage_garage_door_sensor_2225') %}
+          {% if motion_state=='on' %} open {% else %} closed {% endif %} |
+          {{relative_time(states.binary_sensor.garage_garage_door_sensor_2225.last_changed)}}
+        icon: |
+          {% set sensor_state=states(entity) %}
+          {% if sensor_state=='on'%}
+          mdi:garage-open-variant
+          {% else %}
+          mdi:garage-variant
+          {% endif %}
+        icon_color: |
+          {% set sensor_state=states(entity) %}
+          {% if sensor_state=='on'%}
+          red
+          {% else %}
+          green
+          {% endif %}
+        tap_action:
+          action: none
+        hold_action:
+          action: more-info
+        multiline_secondary: true
+      - type: custom:mushroom-entity-card
+        entity: sensor.ehd70x_fuel_level
+        name: GLE450 Fuel
+      - type: custom:mushroom-entity-card
+        entity: sensor.ehd70x_range_liquid
+        name: GLE450 Range
+        icon: mdi:counter
+      - type: custom:mushroom-template-card
+        primary: GLE450 Fill Cost
+        entity: input_number.petrol_price_to_add_gle450
+        secondary: >
+          P98: {{ states('sensor.costco_auburn_p98') | float(0) }} c/L
+        icon: mdi:gas-station
+        icon_color: >
+          {% set level = states('sensor.ehd70x_fuel_level') | float(0) %}
+          {% if level < 25 %}red{% elif level < 50 %}orange{% else %}green{% endif %}
+        badge_icon: >
+          {% if states('sensor.costco_auburn_p98') == 'unavailable' %}mdi:alert{% endif %}
+        tap_action:
+          action: more-info
+        hold_action:
+          action: more-info
+      - type: custom:mushroom-lock-card
+        entity: lock.ehd70x_lock
+        name: GLE450
+        hold_action:
+          action: more-info
