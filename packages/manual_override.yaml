@@ -313,7 +313,7 @@ script:
           end_date_time: "{{ now() + timedelta(minutes=1) }}"
         response_variable: agenda
       - variables:
-          events: "{{ agenda['calendar.battery_overrides'].events | default([]) }}"
+          events: "{{ agenda['calendar.battery_overrides'].events or [] }}"
           winner: >-
             {% set ns = namespace(best={}, bp=-1, bs='') %}
             {% for e in events if not e.summary.startswith('[OFF]') %}
@@ -519,7 +519,7 @@ script:
             result: "{{ result }}"
           new_records: >-
             {{ ([new_rec]
-                + (state_attr('variable.manual_override_history', 'records') | default([])))[:20] }}
+                + (state_attr('variable.manual_override_history', 'records') or []))[:20] }}
       - action: variable.set_variable
         data:
           variable: manual_override_history
@@ -575,7 +575,7 @@ template:
         attributes:
           jobs: >-
             {% set out = namespace(rows=[]) %}
-            {% for e in (agenda['calendar.battery_overrides'].events | default([]))[:12] %}
+            {% for e in (agenda['calendar.battery_overrides'].events or [])[:12] %}
               {% set paused = e.summary.startswith('[OFF]') %}
               {% set md = (e.description | regex_findall('mode:\s*(\w+)') | first | default('?')) %}
               {% set pr = (e.description | regex_findall('priority:\s*(\d+)') | first | default('?')) %}
