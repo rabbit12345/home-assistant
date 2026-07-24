@@ -2,10 +2,16 @@
 """
 Fetch a fuel price from fuelradar.com.au for a given fuel type.
 Usage: python3 fuel_price.py <CODE>
-  CODE: P98, E10, PDSL (or partial match on name, e.g. Diesel)
+  CODE: P98, E10, Diesel (or any partial match on the fuel name/code)
 
 Returns the price in c/L as a float, or exits with code 1 on failure.
-Tries multiple extraction methods in order so it survives site layout changes.
+
+Extraction strategy (most durable first):
+  1. schema.org JSON-LD (GasStation / makesOffer) - a web standard the site
+     emits for SEO, so it survives front-end framework changes.
+  2/3. Framework-internal blobs (Next.js / Inertia) as fallbacks only.
+Prices are normalised to c/L regardless of how the site encodes them
+(dollars 1.667, cents 166.7, or integer tenths 1667).
 """
 
 import sys
@@ -13,11 +19,13 @@ import json
 import re
 
 URL = "https://fuelradar.com.au/map/station/437aa5eea143da5dd19defc3"
+# NOTE: do NOT send an explicit "Accept-Encoding" here. Advertising "br"
+# while curl lacks brotli support makes curl fail with rc 61. Passing
+# --compressed lets curl advertise only the encodings it can decode.
 HEADERS = [
     "-H", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "-H", "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "-H", "Accept-Language: en-AU,en;q=0.9",
-    "-H", "Accept-Encoding: gzip, deflate, br",
 ]
 
 
@@ -36,16 +44,34 @@ def fuel_matches(name, code, target):
     return t in name.upper() or t in code.upper()
 
 
+def to_cents_per_litre(raw):
+    """Normalise a raw price to c/L, whatever unit the site used.
+
+    dollars (1.667) -> *100 ; c/L (166.7) -> as-is ; tenths (1667) -> /10
+    """
+    v = float(raw)
+    if v < 10:          # dollars per litre
+        return v * 100
+    if v > 500:         # integer tenths of a cent
+        return v / 10
+    return v            # already c/L
+
+
 def method_jsonld(html, target):
-    """Schema.org JSON-LD: <script type="application/ld+json">"""
-    m = re.search(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL)
-    if not m:
-        return None
-    data = json.loads(m.group(1))
-    for offer in data.get("makesOffer", []):
-        name = offer.get("itemOffered", {}).get("name", "")
-        if fuel_matches(name, name, target):
-            return offer.get("price")
+    """schema.org JSON-LD. Scan every ld+json block for a GasStation."""
+    for m in re.finditer(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL):
+        try:
+            data = json.loads(m.group(1))
+        except ValueError:
+            continue
+        if data.get("@type") != "GasStation":
+            continue
+        for offer in data.get("makesOffer", []):
+            name = offer.get("itemOffered", {}).get("name", "")
+            if fuel_matches(name, name, target):
+                price = offer.get("price")
+                if price is not None:
+                    return to_cents_per_litre(price)
     return None
 
 
@@ -63,9 +89,7 @@ def method_next_data(html, target):
                   .get("Prices", []))
     for p in prices:
         if fuel_matches(p.get("Name", ""), p.get("Code", ""), target):
-            raw = p.get("Price", 0)
-            # Price stored as integer (e.g. 1687) or float (e.g. 168.7)
-            return raw / 10 if raw > 500 else raw
+            return to_cents_per_litre(p.get("Price", 0))
     return None
 
 
@@ -78,8 +102,7 @@ def method_inertia(html, target):
     prices = data.get("props", {}).get("stationData", {}).get("Prices", [])
     for p in prices:
         if fuel_matches(p.get("Name", ""), p.get("Code", ""), target):
-            raw = p.get("Price", 0)
-            return raw / 10 if raw > 500 else raw
+            return to_cents_per_litre(p.get("Price", 0))
     return None
 
 
@@ -90,6 +113,9 @@ if __name__ == "__main__":
 
     target = sys.argv[1]
     html = fetch_html()
+    if not html:
+        print("fetch failed: empty response", file=sys.stderr)
+        sys.exit(1)
 
     for method in (method_jsonld, method_next_data, method_inertia):
         try:
@@ -100,5 +126,5 @@ if __name__ == "__main__":
         except Exception:
             continue
 
-    # All methods failed
+    print("no price found for %r" % target, file=sys.stderr)
     sys.exit(1)
