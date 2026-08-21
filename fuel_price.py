@@ -64,9 +64,18 @@ def method_jsonld(html, target):
             data = json.loads(m.group(1))
         except ValueError:
             continue
-        if data.get("@type") != "GasStation":
+        # @type may be a single string or a list of types (schema.org allows
+        # multi-typing, e.g. ["GasStation", "AutomotiveBusiness"]).
+        types = data.get("@type", [])
+        if isinstance(types, str):
+            types = [types]
+        if "GasStation" not in types:
             continue
-        for offer in data.get("makesOffer", []):
+        # makesOffer may itself be a single offer object or a list.
+        offers = data.get("makesOffer", [])
+        if isinstance(offers, dict):
+            offers = [offers]
+        for offer in offers:
             name = offer.get("itemOffered", {}).get("name", "")
             if fuel_matches(name, name, target):
                 price = offer.get("price")
