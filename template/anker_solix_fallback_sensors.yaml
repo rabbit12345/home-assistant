@@ -1,0 +1,520 @@
+# ==============================================================================
+# Solix X1 — Fallback Template Sensors
+#
+# Each sensor reads from multiple raw MQTT sources in priority order,
+# returning the first available value. These are the sensors to use on
+# dashboards and in automations instead of the raw ems_second sensors.
+#
+# Fallback chains:
+#   3-tier (ems_second → dynamic_export → ems):
+#     battery_soc, battery_power, grid_power, grid_status, home_demand
+#   2-tier (ems_second → ems):
+#     solar_power, battery_status, plant_status,
+#     pv_to_home/battery/grid, battery_to_home/grid, grid_to_home/battery
+#
+# Requires anker_solix_mqtt_fallback_sources.yaml loaded in mqtt: block.
+#
+# Add to configuration.yaml:
+#   template: !include solix_fallback_sensors.yaml
+# ==============================================================================
+
+  - sensor:
+
+    # ==========================================================================
+    # GROUP A — 3-tier: ems_second (~5s) → dynamic_export (~60s) → ems (~5min)
+    # ==========================================================================
+    
+    - name: "Solix Grid Export Combined Today"
+      unique_id: solix_grid_export_combined_today_kwh
+      unit_of_measurement: "Wh"
+      device_class: energy
+      state_class: total_increasing
+      icon: "mdi:transmission-tower-export"
+      state: >
+        {% set pv = states('sensor.solix_pv_export_today') | float(-1) %}
+        {% set bat = states('sensor.solix_daily_grid_discharged_energy') | float(-1) %}
+        {% if pv >= 0 and bat >= 0 %}
+          {{ pv + bat }}
+        {% else %}
+          unavailable
+        {% endif %}
+          
+    - name: "Solix Grid Import Combined Today"
+      unique_id: solix_grid_import_combined_today_kwh
+      unit_of_measurement: "kWh"
+      device_class: "energy"
+      state_class: "total_increasing"
+      icon: "mdi:home-import-outline"
+      availability: >
+        {{ states('sensor.solix_grid_import_today') not in ['unavailable', 'unknown']
+         and states('sensor.solix_grid_charged_today') not in ['unavailable', 'unknown'] }}
+      state: >
+        {% set import = states('sensor.solix_grid_import_today') | float(0) %}
+        {% set charged = states('sensor.solix_grid_charged_today') | float(0) %}
+        {{ (import + charged) | round(2) }}
+      attributes:
+        grid_import_direct_kwh: >
+          {% set import = states('sensor.solix_grid_import_today') | float(0) %}
+          {{ (import / 1000) | round(2) }}
+        grid_import_for_battery_kwh: >
+          {% set charged = states('sensor.solix_grid_charged_today') | float(0) %}
+          {{ (charged / 1000) | round(2) }}
+        import_percentage: >
+          {% set import = states('sensor.solix_grid_import_today') | float(0) %}
+          {% set charged = states('sensor.solix_grid_charged_today') | float(0) %}
+          {% set total = import + charged %}
+          {% if total > 0 %}
+            {{ ((import / total) * 100) | round(1) }}
+          {% else %}
+            0
+          {% endif %}
+        battery_percentage: >
+          {% set import = states('sensor.solix_grid_import_today') | float(0) %}
+          {% set charged = states('sensor.solix_grid_charged_today') | float(0) %}
+          {% set total = import + charged %}
+          {% if total > 0 %}
+            {{ ((charged / total) * 100) | round(1) }}
+          {% else %}
+            0
+          {% endif %}
+    
+    - name: "Solix Demand Solar Difference"
+      unique_id: solix_demand_solar_difference
+      unit_of_measurement: "W"
+      state_class: measurement
+      device_class: power
+      state: >
+        {% set demand = states('sensor.solix_home_demand_2') | float(0) %}
+        {% set solar = states('sensor.solix_solar_power') | float(0) %}
+        {{ (demand - solar) | int(0) }}
+        
+    - name: "Solix Home Demand"
+      unique_id: solix_fb_home_demand
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:home-lightning-bolt
+      state: >
+        {% set s2  = states('sensor.solix_home_demand') %}
+        {% set dyn = states('sensor.solix_home_demand_dyn') %}
+        {% set ems = states('sensor.solix_home_demand_ems') %}
+        {% set ank_integration = states('sensor.x1_h8k_host_home_demand') %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2  | int(0) }}
+        {% elif dyn not in ['unavailable','unknown','none'] %} {{ dyn | int(0) }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems | int(0) }}
+        {% elif ank_integration not in ['unavailable','unknown','none'] %} {{ ank_integration | float(0) * 1000 }}
+        {% else %} 0 {% endif %}
+      availability: >
+        {{ states('sensor.solix_home_demand')     not in ['none']
+        or states('sensor.solix_home_demand_dyn') not in ['none']
+        or states('sensor.solix_home_demand_ems') not in ['none'] 
+        or states('sensor.x1_h8k_host_home_demand') not in ['none'] }}
+
+    - name: "Solix Battery SOC"
+      unique_id: solix_fb_battery_soc
+      unit_of_measurement: "%"
+      device_class: battery
+      state_class: measurement
+      icon: mdi:battery
+      state: >
+        {% set s2  = states('sensor.solix_battery_soc') %}
+        {% set dyn = states('sensor.solix_battery_soc_dyn') %}
+        {% set ems = states('sensor.solix_battery_soc_ems') %}
+        {% set ank_integration = states('sensor.x1_h8k_host_state_of_charge') %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2  | float(0) }}
+        {% elif dyn not in ['unavailable','unknown','none'] %} {{ dyn | float(0) }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems | float(0) }}
+        {% elif ank_integration not in ['unavailable','unknown','none'] %} {{ ank_integration | float(0) * 1000 }}
+        {% else %} 0 {% endif %}
+      availability: >
+        {{ states('sensor.solix_battery_soc')     not in ['none']
+        or states('sensor.solix_battery_soc_dyn') not in ['none']
+        or states('sensor.solix_battery_soc_ems') not in ['none'] 
+        or states('sensor.x1_h8k_host_state_of_charge') not in ['none'] }}
+
+    - name: "Solix Battery Power"
+      unique_id: solix_fb_battery_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:battery-arrow-up-outline
+      state: >
+        {% set s2  = states('sensor.solix_battery_power') %}
+        {% set ems = states('sensor.solix_battery_power_ems') %}
+        {% set ank_integration = states('sensor.x1_h8k_host_discharge_power') %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2  | int(0) }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems | int(0) }}
+        {% elif ank_integration not in ['unavailable','unknown','none'] %} {{ ank_integration | float(0) * 1000 }}
+        {% else %} 0 {% endif %}
+      availability: >
+        {{ states('sensor.solix_battery_power')     not in ['none']
+        or states('sensor.solix_battery_power_ems') not in ['none'] 
+        or states('sensor.x1_h8k_host_discharge_power') not in ['none'] }}
+
+    - name: "Solix Grid Power"
+      unique_id: solix_fb_grid_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:transmission-tower
+      state: >
+        {% set s2  = states('sensor.solix_grid_power') %}
+        {% set dyn = states('sensor.solix_grid_power_dyn') %}
+        {% set ems = states('sensor.solix_grid_power_ems') %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2  | int(0) }}
+        {% elif dyn not in ['unavailable','unknown','none'] %} {{ dyn | int(0) }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems | int(0) }}
+        {% else %} 0 {% endif %}
+      availability: >
+        {{ states('sensor.solix_grid_power')     not in ['none']
+        or states('sensor.solix_grid_power_dyn') not in ['none']
+        or states('sensor.solix_grid_power_ems') not in ['none'] }}
+
+    - name: "Solix Grid Status"
+      unique_id: solix_fb_grid_status
+      icon: mdi:transmission-tower
+      state: >
+        {% set s2  = states('sensor.solix_grid_status') %}
+        {% set dyn = states('sensor.solix_grid_status_dyn') %}
+        {% set ems = states('sensor.solix_grid_status_ems') %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2 }}
+        {% elif dyn not in ['unavailable','unknown','none'] %} {{ dyn }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems }}
+        {% else %} unknown {% endif %}
+      availability: >
+        {{ states('sensor.solix_grid_status')     not in ['none']
+        or states('sensor.solix_grid_status_dyn') not in ['none']
+        or states('sensor.solix_grid_status_ems') not in ['none'] }}
+
+    # ==========================================================================
+    # GROUP B — 2-tier: ems_second (~5s) → ems (~5min)
+    # ==========================================================================
+
+    - name: "Solix Solar Power"
+      unique_id: solix_fb_solar_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:solar-power
+      state: >
+        {% set s2  = states('sensor.solix_solar_power') %}
+        {% set dyn = states('sensor.solix_solar_power_dyn') %}
+        {% set ems = states('sensor.solix_solar_power_ems') %}
+        {% set ank_integration = states('sensor.x1_h8k_host_solar_power') %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2  | int(0) }}
+        {% elif dyn not in ['unavailable','unknown','none'] %} {{ dyn | int(0) }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems | int(0) }}
+        {% elif ank_integration not in ['unavailable','unknown','none'] %} {{ ank_integration | float(0) * 1000 }}
+        {% else %} 0 {% endif %}
+      availability: >
+        {{ states('sensor.solix_solar_power')     not in ['none']
+        or states('sensor.solix_solar_power_dyn') not in ['none']
+        or states('sensor.solix_solar_power_ems') not in ['none']
+        or states('sensor.x1_h8k_host_solar_power') not in ['none'] }}
+
+    - name: "Solix Battery Status"
+      unique_id: solix_fb_battery_status
+      icon: mdi:battery-check
+      state: >
+        {% set s2  = states('sensor.solix_battery_status') %}
+        {% set ems = states('sensor.solix_grid_status_ems') %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2 }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems }}
+        {% else %} unknown {% endif %}
+      availability: >
+        {{ states('sensor.solix_battery_status')     not in ['none']
+        or states('sensor.solix_grid_status_ems') not in ['none'] }}
+
+    - name: "Solix Plant Status"
+      unique_id: solix_fb_plant_status
+      icon: mdi:solar-power-variant
+      state: >
+        {% set s2  = states('sensor.solix_plant_status') %}
+        {% set ems = states('sensor.solix_plant_status_ems') %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2 }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems }}
+        {% else %} unknown {% endif %}
+      availability: >
+        {{ states('sensor.solix_plant_status')     not in ['none']
+        or states('sensor.solix_plant_status_ems') not in ['none'] }}
+
+    - name: "Solix PV to Home Power"
+      unique_id: solix_fb_pv_to_home_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:solar-power-variant
+      state: >
+        {% set s2  = states('sensor.solix_pv_to_home_power') %}
+        {% set ems = states('sensor.solix_pv_to_home_power_ems') %}
+        {% set ank_integration_pv = states('sensor.x1_h8k_host_solar_power') | float(0) %}
+        {% set ank_integration_home = states('sensor.x1_h8k_host_home_demand') | float(0) %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2  | int(0) }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems | int(0) }}
+        {% elif ank_integration_pv not in ['unavailable','unknown','none'] %} {{ ank_integration_home | float(0) * 1000 if ank_integration_pv > ank_integration_home else 0 }}
+        {% else %} 0 {% endif %}
+      availability: >
+        {{ states('sensor.solix_pv_to_home_power')     not in ['none']
+        or states('sensor.solix_pv_to_home_power_ems') not in ['none'] 
+        or states('sensor.x1_h8k_host_home_demand') not in ['none'] }}
+
+    - name: "Solix PV to Battery Power"
+      unique_id: solix_fb_pv_to_battery_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:solar-power-variant-outline
+      state: >
+        {% set s2  = states('sensor.solix_pv_to_battery_power') %}
+        {% set ems = states('sensor.solix_pv_to_battery_power_ems') %}
+        {% set ank_integration_pv = states('sensor.x1_h8k_host_solar_power') | float(0) %}
+        {% set ank_integration_charge = states('sensor.x1_h8k_host_charge_power') | float(0) %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2  | int(0) }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems | int(0) }}
+        {% elif ank_integration_pv not in ['unavailable','unknown','none'] %} {{ ank_integration_charge | float(0) * 1000 if ank_integration_pv > ank_integration_charge else 0 }}
+        {% else %} 0 {% endif %}
+      availability: >
+        {{ states('sensor.solix_pv_to_battery_power')     not in ['none']
+        or states('sensor.solix_pv_to_battery_power_ems') not in ['none'] 
+        or states('sensor.x1_h8k_host_solar_power') not in ['none'] }}
+
+    - name: "Solix PV to Grid Power"
+      unique_id: solix_fb_pv_to_grid_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:transmission-tower-export
+      state: >
+        {% set s2  = states('sensor.solix_pv_to_grid_power') %}
+        {% set ems = states('sensor.solix_pv_to_grid_power_ems') %}
+        {% set ank_integration = states('sensor.x1_h8k_host_grid_export') %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2  | int(0) }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems | int(0) }}
+        {% elif ank_integration not in ['unavailable','unknown','none'] %} {{ ank_integration | float(0) * 1000 }}
+        {% else %} 0 {% endif %}
+      availability: >
+        {{ states('sensor.solix_pv_to_grid_power')     not in ['none']
+        or states('sensor.solix_pv_to_grid_power_ems') not in ['none'] 
+        or states('sensor.x1_h8k_host_grid_export') not in ['none'] }}
+
+    - name: "Solix Battery to Home Power"
+      unique_id: solix_fb_battery_to_home_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:battery-arrow-down
+      state: >
+        {% set s2  = states('sensor.solix_battery_to_home_power') %}
+        {% set ems = states('sensor.solix_battery_to_home_power_ems') %}
+        {% set ank_integration = states('sensor.x1_h8k_host_discharge_power') %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2  | int(0) }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems | int(0) }}
+        {% elif ank_integration not in ['unavailable','unknown','none'] %} {{ ank_integration | float(0) * 1000 }}
+        {% else %} 0 {% endif %}
+      availability: >
+        {{ states('sensor.solix_battery_to_home_power')     not in ['none']
+        or states('sensor.solix_battery_to_home_power_ems') not in ['none'] 
+        or states('sensor.x1_h8k_host_discharge_power') not in ['none'] }}
+
+    - name: "Solix Battery to Grid Power"
+      unique_id: solix_fb_battery_to_grid_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:battery-arrow-down-outline
+      state: >
+        {% set s2  = states('sensor.solix_battery_to_grid_power') %}
+        {% set ems = states('sensor.solix_battery_to_grid_power_ems') %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2  | int(0) }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems | int(0) }}
+        {% else %} 0 {% endif %}
+      availability: >
+        {{ states('sensor.solix_battery_to_grid_power')     not in ['none']
+        or states('sensor.solix_battery_to_grid_power_ems') not in ['none'] }}
+
+    - name: "Solix Grid to Home Power"
+      unique_id: solix_fb_grid_to_home_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:transmission-tower-import
+      state: >
+        {% set s2  = states('sensor.solix_grid_to_home_power') %}
+        {% set ems = states('sensor.solix_grid_to_home_power_ems') %}
+        {% set ank_integration = states('sensor.x1_h8k_host_grid_import') %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2  | int(0) }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems | int(0) }}
+        {% elif ank_integration not in ['unavailable','unknown','none'] %} {{ ank_integration | float(0) * 1000 }}
+        {% else %} 0 {% endif %}
+      availability: >
+        {{ states('sensor.solix_grid_to_home_power')     not in ['none']
+        or states('sensor.solix_grid_to_home_power_ems') not in ['none'] 
+        or states('sensor.x1_h8k_host_grid_import') not in ['none'] }}
+
+    - name: "Solix Grid to Battery Power"
+      unique_id: solix_fb_grid_to_battery_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:transmission-tower-import
+      state: >
+        {% set s2  = states('sensor.solix_grid_to_battery_power') %}
+        {% set ems = states('sensor.solix_grid_to_battery_power_ems') %}
+        {% set ank_integration_import = states('sensor.x1_h8k_host_grid_import') | float(0) %}
+        {% set ank_integration_charge = states('sensor.x1_h8k_host_charge_power') | float(0) %}
+        {% if   s2  not in ['unavailable','unknown','none'] %} {{ s2  | int(0) }}
+        {% elif ems not in ['unavailable','unknown','none'] %} {{ ems | int(0) }}
+        {% elif ank_integration_charge not in ['unavailable','unknown','none'] %} {{ ank_integration_charge | float(0) * 1000 if ank_integration_import > ank_integration_charge else 0}}
+        {% else %} 0 {% endif %}
+      availability: >
+        {{ states('sensor.solix_grid_to_battery_power')     not in ['none']
+        or states('sensor.solix_grid_to_battery_power_ems') not in ['none'] 
+        or states('sensor.x1_h8k_host_grid_import') not in ['none'] }}
+
+
+    # --------------------------------------------------------------------------
+    # SOLIX BATTERY CHARGING POWER
+    # Returns watts flowing INTO the battery. Always >= 0.
+    #
+    # Tier 1: pv_to_battery_power + grid_to_battery_power          (ems_second ~5s)
+    # Tier 2: max(sp − lp − gp, 0)  energy balance estimate        (dynamic_export ~60s)
+    # Tier 3: pv_to_battery_power + grid_to_battery_power          (ems ~5min)
+    # --------------------------------------------------------------------------
+    - name: "Solix Battery Charging Power"
+      unique_id: solix_battery_charging_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:battery-charging-high
+      availability: >
+        {{
+          states('sensor.solix_pv_to_battery_power')    not in ['unavailable','unknown','none']
+          or states('sensor.solix_grid_to_battery_power') not in ['unavailable','unknown','none']
+          or (
+               states('sensor.solix_dyn_solar_power')   not in ['unavailable','unknown','none']
+               and states('sensor.solix_dyn_home_demand') not in ['unavailable','unknown','none']
+               and states('sensor.solix_dyn_grid_power')  not in ['unavailable','unknown','none']
+             )
+          or states('sensor.solix_ems_pv_to_battery_power')    not in ['unavailable','unknown','none']
+          or states('sensor.solix_ems_grid_to_battery_power')   not in ['unavailable','unknown','none']
+          or states('sensor.x1_h8k_host_charge_power')    not in ['unavailable','unknown','none']
+        }}
+      state: >
+        # ── Tier 1: ems_second directional flows (~5 s) ──────────────────── #
+        {% set p2b_s2 = states('sensor.solix_pv_to_battery_power')   | float(-1) %}
+        {% set g2b_s2 = states('sensor.solix_grid_to_battery_power') | float(-1) %}
+        {% set tier1_ok = p2b_s2 >= 0 and g2b_s2 >= 0 %}
+
+        # ── Tier 2: dynamic_export energy balance (~60 s) ───────────────── #
+        {% set solar_dyn = states('sensor.solix_dyn_solar_power')  | float(-1) %}
+        {% set home_dyn  = states('sensor.solix_dyn_home_demand')  | float(-1) %}
+        {% set grid_dyn  = states('sensor.solix_dyn_grid_power')   | float(-999) %}
+        {% set tier2_ok  = solar_dyn >= 0 and home_dyn >= 0 and grid_dyn != -999 %}
+
+        # ── Tier 3: ems directional flows (~5 min) ───────────────────────── #
+        {% set p2b_ems = states('sensor.solix_ems_pv_to_battery_power')   | float(-1) %}
+        {% set g2b_ems = states('sensor.solix_ems_grid_to_battery_power') | float(-1) %}
+        {% set tier3_ok = p2b_ems >= 0 and g2b_ems >= 0 %}
+
+        # ── Tier 4: anker integration (~5 min) ───────────────────────── #
+        {% set ank_integration = states('sensor.x1_h8k_host_charge_power') | float(-1) %}
+        {% set tier4_ok = ank_integration >= 0 %}
+
+        # ── Select highest available tier ───────────────────────────────── #
+        {% if tier1_ok %}
+          {{ (p2b_s2 + g2b_s2) | int(0) }}
+        {% elif tier2_ok %}
+          {% set balance = solar_dyn - home_dyn - grid_dyn %}
+          {{ [balance, 0] | max | int(0) }}
+        {% elif tier3_ok %}
+          {{ (p2b_ems + g2b_ems) | int(0) }}
+        {% elif tier4_ok %}
+          {{ ank_integration | float(0) * 1000 }}
+        {% else %}
+          0
+        {% endif %}
+
+    # --------------------------------------------------------------------------
+    # SOLIX BATTERY DISCHARGING POWER
+    # Returns watts flowing OUT of the battery. Always >= 0.
+    #
+    # Tier 1: battery_to_home_power + battery_to_grid_power        (ems_second ~5s)
+    # Tier 2: max(-(sp − lp − gp), 0)  energy balance estimate     (dynamic_export ~60s)
+    # Tier 3: battery_to_home_power + battery_to_grid_power        (ems ~5min)
+    # Tier 4: anker own integration                                (anker inte ~5min)
+    # --------------------------------------------------------------------------
+    - name: "Solix Battery Discharging Power"
+      unique_id: solix_battery_discharging_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:battery-arrow-down
+      availability: >
+        {{
+          states('sensor.solix_battery_to_home_power')   not in ['unavailable','unknown','none']
+          or states('sensor.solix_battery_to_grid_power') not in ['unavailable','unknown','none']
+          or (
+               states('sensor.solix_dyn_solar_power')   not in ['unavailable','unknown','none']
+               and states('sensor.solix_dyn_home_demand') not in ['unavailable','unknown','none']
+               and states('sensor.solix_dyn_grid_power')  not in ['unavailable','unknown','none']
+             )
+          or states('sensor.solix_ems_battery_to_home_power')   not in ['unavailable','unknown','none']
+          or states('sensor.solix_ems_battery_to_grid_power')    not in ['unavailable','unknown','none']
+          or states('sensor.x1_h8k_host_discharge_power')    not in ['unavailable','unknown','none']
+        }}
+      state: >
+        # ── Tier 1: ems_second directional flows (~5 s) ──────────────────── #
+        {% set b2h_s2 = states('sensor.solix_battery_to_home_power') | float(-1) %}
+        {% set b2g_s2 = states('sensor.solix_battery_to_grid_power') | float(-1) %}
+        {% set tier1_ok = b2h_s2 >= 0 and b2g_s2 >= 0 %}
+
+        # ── Tier 2: dynamic_export energy balance (~60 s) ───────────────── #
+        {% set solar_dyn = states('sensor.solix_dyn_solar_power')  | float(-1) %}
+        {% set home_dyn  = states('sensor.solix_dyn_home_demand')  | float(-1) %}
+        {% set grid_dyn  = states('sensor.solix_dyn_grid_power')   | float(-999) %}
+        {% set tier2_ok  = solar_dyn >= 0 and home_dyn >= 0 and grid_dyn != -999 %}
+
+        # ── Tier 3: ems directional flows (~5 min) ───────────────────────── #
+        {% set b2h_ems = states('sensor.solix_ems_battery_to_home_power') | float(-1) %}
+        {% set b2g_ems = states('sensor.solix_ems_battery_to_grid_power') | float(-1) %}
+        {% set tier3_ok = b2h_ems >= 0 and b2g_ems >= 0 %}
+
+        # ── Tier 4: anker integration (~5 min) ───────────────────────── #
+        {% set ank_integration = states('sensor.x1_h8k_host_discharge_power') | float(-1) %}
+        {% set tier4_ok = ank_integration >= 0 %}
+
+        # ── Select highest available tier ───────────────────────────────── #
+        {% if tier1_ok %}
+          {{ (b2h_s2 + b2g_s2) | int(0) }}
+        {% elif tier2_ok %}
+          {% set balance = solar_dyn - home_dyn - grid_dyn %}
+          {{ [balance * -1, 0] | max | int(0) }}
+        {% elif tier3_ok %}
+          {{ (b2h_ems + b2g_ems) | int(0) }}
+        {% elif tier4_ok %}
+          {{ ank_integration | float(0) * 1000 }}
+        {% else %}
+          0
+        {% endif %}
+
+    # --------------------------------------------------------------------------
+    # BONUS: SOLIX BATTERY NET POWER
+    # Signed summary: positive = net charging, negative = net discharging.
+    # Derived from the two sensors above — no additional source queries needed.
+    # Useful as a single signed sensor for dashboards that expect +/- convention.
+    # --------------------------------------------------------------------------
+    - name: "Solix Battery Net Power"
+      unique_id: solix_battery_net_power
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:battery-arrow-up-outline
+      availability: >
+        {{
+          states('sensor.solix_battery_charging_power')    not in ['unavailable','unknown','none']
+          or states('sensor.solix_battery_discharging_power') not in ['unavailable','unknown','none']
+        }}
+      state: >
+        {% set chg = states('sensor.solix_battery_charging_power')    | float(0) %}
+        {% set dch = states('sensor.solix_battery_discharging_power') | float(0) %}
+        {{ (chg - dch) | int(0) }}
