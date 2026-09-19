@@ -189,7 +189,7 @@
       - name: "Battery Full ETA"
         unique_id: battery_full_eta
         state: >
-          {% set t = states('sensor.battery_time_to_full_hours') %}
+          {% set t = states('sensor.battery_time_to_full_hr') %}
           {% if t in ['unknown','unavailable',''] %}
             unknown
           {% else %}
