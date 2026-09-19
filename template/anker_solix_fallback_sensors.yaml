@@ -30,14 +30,13 @@
       device_class: energy
       state_class: total_increasing
       icon: "mdi:transmission-tower-export"
+      availability: >
+        {{ states('sensor.solix_pv_export_today') | float(-1) >= 0
+         and states('sensor.solix_daily_grid_discharged_energy') | float(-1) >= 0 }}
       state: >
         {% set pv = states('sensor.solix_pv_export_today') | float(-1) %}
         {% set bat = states('sensor.solix_daily_grid_discharged_energy') | float(-1) %}
-        {% if pv >= 0 and bat >= 0 %}
-          {{ pv + bat }}
-        {% else %}
-          unavailable
-        {% endif %}
+        {{ pv + bat }}
           
     - name: "Solix Grid Import Combined Today"
       unique_id: solix_grid_import_combined_today_kwh
@@ -400,27 +399,27 @@
           or states('sensor.x1_h8k_host_charge_power')    not in ['unavailable','unknown','none']
         }}
       state: >
-        # ── Tier 1: ems_second directional flows (~5 s) ──────────────────── #
+        {# ── Tier 1: ems_second directional flows (~5 s) ──────────────────── #}
         {% set p2b_s2 = states('sensor.solix_pv_to_battery_power')   | float(-1) %}
         {% set g2b_s2 = states('sensor.solix_grid_to_battery_power') | float(-1) %}
         {% set tier1_ok = p2b_s2 >= 0 and g2b_s2 >= 0 %}
 
-        # ── Tier 2: dynamic_export energy balance (~60 s) ───────────────── #
+        {# ── Tier 2: dynamic_export energy balance (~60 s) ───────────────── #}
         {% set solar_dyn = states('sensor.solix_dyn_solar_power')  | float(-1) %}
         {% set home_dyn  = states('sensor.solix_dyn_home_demand')  | float(-1) %}
         {% set grid_dyn  = states('sensor.solix_dyn_grid_power')   | float(-999) %}
         {% set tier2_ok  = solar_dyn >= 0 and home_dyn >= 0 and grid_dyn != -999 %}
 
-        # ── Tier 3: ems directional flows (~5 min) ───────────────────────── #
+        {# ── Tier 3: ems directional flows (~5 min) ───────────────────────── #}
         {% set p2b_ems = states('sensor.solix_ems_pv_to_battery_power')   | float(-1) %}
         {% set g2b_ems = states('sensor.solix_ems_grid_to_battery_power') | float(-1) %}
         {% set tier3_ok = p2b_ems >= 0 and g2b_ems >= 0 %}
 
-        # ── Tier 4: anker integration (~5 min) ───────────────────────── #
+        {# ── Tier 4: anker integration (~5 min) ───────────────────────── #}
         {% set ank_integration = states('sensor.x1_h8k_host_charge_power') | float(-1) %}
         {% set tier4_ok = ank_integration >= 0 %}
 
-        # ── Select highest available tier ───────────────────────────────── #
+        {# ── Select highest available tier ───────────────────────────────── #}
         {% if tier1_ok %}
           {{ (p2b_s2 + g2b_s2) | int(0) }}
         {% elif tier2_ok %}
@@ -463,27 +462,27 @@
           or states('sensor.x1_h8k_host_discharge_power')    not in ['unavailable','unknown','none']
         }}
       state: >
-        # ── Tier 1: ems_second directional flows (~5 s) ──────────────────── #
+        {# ── Tier 1: ems_second directional flows (~5 s) ──────────────────── #}
         {% set b2h_s2 = states('sensor.solix_battery_to_home_power') | float(-1) %}
         {% set b2g_s2 = states('sensor.solix_battery_to_grid_power') | float(-1) %}
         {% set tier1_ok = b2h_s2 >= 0 and b2g_s2 >= 0 %}
 
-        # ── Tier 2: dynamic_export energy balance (~60 s) ───────────────── #
+        {# ── Tier 2: dynamic_export energy balance (~60 s) ───────────────── #}
         {% set solar_dyn = states('sensor.solix_dyn_solar_power')  | float(-1) %}
         {% set home_dyn  = states('sensor.solix_dyn_home_demand')  | float(-1) %}
         {% set grid_dyn  = states('sensor.solix_dyn_grid_power')   | float(-999) %}
         {% set tier2_ok  = solar_dyn >= 0 and home_dyn >= 0 and grid_dyn != -999 %}
 
-        # ── Tier 3: ems directional flows (~5 min) ───────────────────────── #
+        {# ── Tier 3: ems directional flows (~5 min) ───────────────────────── #}
         {% set b2h_ems = states('sensor.solix_ems_battery_to_home_power') | float(-1) %}
         {% set b2g_ems = states('sensor.solix_ems_battery_to_grid_power') | float(-1) %}
         {% set tier3_ok = b2h_ems >= 0 and b2g_ems >= 0 %}
 
-        # ── Tier 4: anker integration (~5 min) ───────────────────────── #
+        {# ── Tier 4: anker integration (~5 min) ───────────────────────── #}
         {% set ank_integration = states('sensor.x1_h8k_host_discharge_power') | float(-1) %}
         {% set tier4_ok = ank_integration >= 0 %}
 
-        # ── Select highest available tier ───────────────────────────────── #
+        {# ── Select highest available tier ───────────────────────────────── #}
         {% if tier1_ok %}
           {{ (b2h_s2 + b2g_s2) | int(0) }}
         {% elif tier2_ok %}
