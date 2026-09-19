@@ -203,25 +203,25 @@
       name: "Piano Room Switchbot Curtains"
       device_class: curtain
       open_cover:
-        - data:
-          deviceId: EC415B8BB5B2
-          command: turnOn
-          action: rest_command.switchbot_device_command
+        - action: rest_command.switchbot_device_command
+          data:
+            deviceId: EC415B8BB5B2
+            command: turnOn
       close_cover:
-        - data:
-          deviceId: EC415B8BB5B2
-          command: turnOff
-          action: rest_command.switchbot_device_command
+        - action: rest_command.switchbot_device_command
+          data:
+            deviceId: EC415B8BB5B2
+            command: turnOff
       stop_cover:
-        - data:
-          deviceId: EC415B8BB5B2
-          command: turnOff
-          action: rest_command.switchbot_device_command
+        - action: rest_command.switchbot_device_command
+          data:
+            deviceId: EC415B8BB5B2
+            command: turnOff
       set_cover_position:
-        - data:
-          deviceId: EC415B8BB5B2
-          command: setPosition
-          parameter: 0,ff,{{position}}
-          action: rest_command.switchbot_device_command
+        - action: rest_command.switchbot_device_command
+          data:
+            deviceId: EC415B8BB5B2
+            command: setPosition
+            parameter: "0,ff,{{ position }}"
       position: '{{ states(''sensor.piano_room_switchbot_curtains_position'') }}'
         
