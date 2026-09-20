@@ -1,11 +1,13 @@
 blueprint:
   name: "Light Timer: Activity Hold + Sunset Schedule"
   description: >-
-    All-in-one controller for one or more lights. Turns them on at sunset
-    (+offset) at their idle level, brightens them when any activity sensor fires,
-    holds them bright on a timer helper that each new activity extends (capped at
-    the timer duration), returns them to their prior state - or to a dim level, or
-    off - when the timer expires, and turns them off at sunset + an end offset.
+    All-in-one controller for one or more lights. Turns them on when an activity
+    sensor fires inside an evening window defined by offsets from sunset, holds
+    them on with a timer helper that each new activity extends (capped at the
+    timer duration), returns them to their prior state - or to a dim level, or
+    off - when the timer expires, and sweeps them off at the end of the window.
+    The lights are never switched on by the schedule itself, only by activity
+    inside it.
     Dimmable and non-dimmable lights are handled separately, so a plain on/off
     light is never sent a brightness it cannot use.
     Replaces the usual cluster of separate "turn on at sunset", "brighten on
@@ -129,9 +131,8 @@ blueprint:
     idle_brightness_pct:
       name: Idle Brightness (%)
       description: >-
-        Brightness for dimmable lights at sunset, and after the hold timer expires
-        when On Timer Expiry is "Dim to idle brightness".
-        Non-dimmable lights are simply switched on at sunset.
+        Brightness for dimmable lights after the hold timer expires, when On Timer
+        Expiry is "Dim to idle brightness". Not used otherwise.
       default: 20
       selector:
         number:
@@ -144,31 +145,31 @@ blueprint:
     sunset_schedule_toggle:
       name: Sunset Schedule Toggle
       description: >-
-        Helper 4 of 4. An input_boolean that enables the sunset schedule.
-        While it is on, the light turns on at idle brightness at sunset + Sunset
-        On Offset, turns off at sunset + Sunset Off Offset, and activity sensors
-        are ignored outside that window.
-        While it is off, there is no schedule at all and activity sensors run at
-        any hour. Create at Settings > Devices & Services > Helpers > Toggle.
+        Helper 4 of 4. An input_boolean that enables the evening window.
+        While it is on, activity sensors only act between sunset + Window Start
+        Offset and sunset + Window End Offset, and the lights are swept off at the
+        end of the window.
+        While it is off, there is no window at all and activity sensors run at any
+        hour. Create at Settings > Devices & Services > Helpers > Toggle.
       selector:
         entity:
           filter:
             domain: input_boolean
 
     sunset_on_offset:
-      name: Sunset On Offset
+      name: Window Start Offset
       description: >-
-        Time relative to sunset to turn the light on at idle brightness, as
-        H:MM:SS. Prefix with "-" for before sunset (e.g. -0:30:00).
+        Time relative to sunset at which activity starts turning the lights on,
+        as H:MM:SS. Prefix with "-" for before sunset (e.g. -0:30:00).
       default: "0:00:00"
       selector:
         text:
 
     sunset_off_offset:
-      name: Sunset Off Offset
+      name: Window End Offset
       description: >-
-        Time after sunset to turn the light off and close the activity window,
-        as H:MM:SS (e.g. 2:30:00).
+        Time after sunset at which the window closes: activity stops acting and
+        the lights are swept off. As H:MM:SS (e.g. 2:30:00).
       default: "2:30:00"
       selector:
         text:
@@ -227,8 +228,8 @@ variables:
   enabled: "{{ is_state(enable_toggle_var, 'on') }}"
   schedule_on: "{{ is_state(sunset_schedule_var, 'on') }}"
 
-  # Activity window. With no sunset schedule the window is always open;
-  # otherwise it runs from today's sunset + on offset to sunset + off offset.
+  # Activity window. With the window toggle off it is always open; otherwise it
+  # runs from today's sunset + start offset to sunset + end offset.
   # Today's sunset is next_setting - 24h once the sun is already down.
   in_window: >-
     {% if not is_state(sunset_schedule_var, 'on') %}
@@ -258,11 +259,6 @@ triggers:
     entity_id: !input timer_entity
     to: idle
     id: expired
-
-  - trigger: sun
-    event: sunset
-    offset: !input sunset_on_offset
-    id: sunset_on
 
   - trigger: sun
     event: sunset
@@ -385,25 +381,8 @@ actions:
                 target:
                   entity_id: !input light_entity
 
-      # Scheduled on at sunset, at idle brightness.
-      - alias: "Sunset on"
-        conditions:
-          - condition: trigger
-            id: sunset_on
-          - condition: template
-            value_template: "{{ schedule_on }}"
-        sequence:
-          - action: light.turn_on
-            target:
-              entity_id: "{{ dimmable_lights }}"
-            data:
-              brightness_pct: "{{ idle_brightness_var | int(20) }}"
-          - action: light.turn_on
-            target:
-              entity_id: "{{ plain_lights }}"
-
-      # Scheduled off: cancel any hold so its expiry cannot re-light the lights.
-      - alias: "Sunset off"
+      # Window close: cancel any hold so its expiry cannot re-light the lights.
+      - alias: "Window close"
         conditions:
           - condition: trigger
             id: sunset_off
