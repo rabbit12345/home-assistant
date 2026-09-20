@@ -1,11 +1,11 @@
 blueprint:
   name: "Light Timer: Activity Hold + Sunset Schedule"
   description: >-
-    All-in-one light controller. Turns a light on at sunset (+offset) at its idle
-    level, brightens it when any activity sensor fires, holds it bright on a timer
-    helper that each new activity extends (capped at the timer duration), returns
-    it to idle - off or dimmed - when the timer expires, and turns it off at
-    sunset + an end offset.
+    All-in-one controller for one or more lights. Turns them on at sunset
+    (+offset) at their idle level, brightens them when any activity sensor fires,
+    holds them bright on a timer helper that each new activity extends (capped at
+    the timer duration), returns them to idle - off or dimmed - when the timer
+    expires, and turns them off at sunset + an end offset.
     Replaces the usual cluster of separate "turn on at sunset", "brighten on
     motion", "extend timer", "timer expired" and "turn off" automations.
     Requires four helpers per instance, created at
@@ -29,12 +29,15 @@ blueprint:
           multiple: true
 
     light_entity:
-      name: Light
-      description: The light to control.
+      name: Light(s)
+      description: >-
+        One or more lights to control. All of them are driven together - the same
+        brightness, on at sunset, off at the end of the schedule.
       selector:
         entity:
           filter:
             domain: light
+          multiple: true
 
     timer_entity:
       name: Hold Timer Helper
@@ -90,7 +93,7 @@ blueprint:
 
     active_brightness_pct:
       name: Active Brightness (%)
-      description: Brightness while the hold timer is running.
+      description: Brightness for all controlled lights while the hold timer is running.
       default: 40
       selector:
         number:
@@ -163,7 +166,6 @@ blueprint:
 
 
 variables:
-  light_var: !input light_entity
   timer_var: !input timer_entity
   enable_toggle_var: !input enable_toggle
   hold_minutes_helper_var: !input hold_minutes_helper
