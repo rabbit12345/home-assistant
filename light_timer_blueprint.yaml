@@ -1,0 +1,347 @@
+blueprint:
+  name: "Light Timer: Activity Hold + Sunset Schedule"
+  description: >-
+    All-in-one light controller. Turns a light on at sunset (+offset) at its idle
+    level, brightens it when any activity sensor fires, holds it bright on a timer
+    helper that each new activity extends (capped at the timer duration), returns
+    it to idle - off or dimmed - when the timer expires, and turns it off at
+    sunset + an end offset.
+    Replaces the usual cluster of separate "turn on at sunset", "brighten on
+    motion", "extend timer", "timer expired" and "turn off" automations.
+    Requires one Timer helper per instance -
+    create at Settings > Devices & Services > Helpers > Timer.
+  domain: automation
+  source_url: https://community.home-assistant.io/
+
+  input:
+
+    activity_sensors:
+      name: Activity Sensor(s)
+      description: >-
+        Motion, occupancy or door/contact sensors. Any one going ON brightens the
+        light and starts or extends the hold timer.
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
+          multiple: true
+
+    light_entity:
+      name: Light
+      description: The light to control.
+      selector:
+        entity:
+          filter:
+            domain: light
+
+    timer_entity:
+      name: Hold Timer Helper
+      description: >-
+        The Timer helper this instance owns. Use a unique helper per instance -
+        create at Settings > Devices & Services > Helpers > Timer.
+        Its own configured duration is irrelevant; this blueprint always starts it
+        with the Hold Duration below.
+      selector:
+        entity:
+          filter:
+            domain: timer
+
+    enable_toggle:
+      name: Enable Toggle (optional)
+      description: >-
+        Optional input_boolean that gates activity handling. When set, activity
+        sensors are ignored while it is off. Leave empty to always run.
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
+          multiple: true
+
+    hold_minutes:
+      name: Hold Duration (minutes)
+      description: How long the light stays bright after activity.
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 240
+          step: 1
+          unit_of_measurement: min
+          mode: box
+
+    hold_minutes_helper:
+      name: Hold Duration Helper (optional)
+      description: >-
+        Optional input_number whose value overrides Hold Duration, so the hold can
+        be changed from a dashboard. Leave empty to use the fixed value above.
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: input_number
+          multiple: true
+
+    extend_seconds:
+      name: Extension Per Activity (seconds)
+      description: >-
+        How much each new activity adds to a running timer. The extension is
+        capped so the remaining time never exceeds the Hold Duration - Home
+        Assistant rejects any timer change beyond it.
+      default: 60
+      selector:
+        number:
+          min: 5
+          max: 600
+          step: 5
+          unit_of_measurement: s
+          mode: box
+
+    active_brightness_pct:
+      name: Active Brightness (%)
+      description: Brightness while the hold timer is running.
+      default: 40
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+          mode: slider
+
+    idle_action:
+      name: On Timer Expiry
+      description: >-
+        What to do when the hold timer expires. "Dim to idle brightness" keeps the
+        light on at a low level (front-of-house use). "Turn off" switches it off
+        (garage / interior use).
+      default: dim
+      selector:
+        select:
+          options:
+            - label: Dim to idle brightness
+              value: dim
+            - label: Turn off
+              value: "off"
+
+    idle_brightness_pct:
+      name: Idle Brightness (%)
+      description: >-
+        Brightness at sunset and after the hold timer expires.
+        Only used when On Timer Expiry is "Dim to idle brightness".
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+          mode: slider
+
+    use_sunset_schedule:
+      name: Use Sunset Schedule
+      description: >-
+        When ON, the light turns on at idle brightness at sunset + Sunset On
+        Offset, turns off at sunset + Sunset Off Offset, and activity sensors are
+        ignored outside that window.
+        When OFF, there is no schedule and activity sensors run at any hour.
+      default: true
+      selector:
+        boolean:
+
+    sunset_on_offset:
+      name: Sunset On Offset
+      description: >-
+        Time relative to sunset to turn the light on at idle brightness, as
+        H:MM:SS. Prefix with "-" for before sunset (e.g. -0:30:00).
+      default: "0:00:00"
+      selector:
+        text:
+
+    sunset_off_offset:
+      name: Sunset Off Offset
+      description: >-
+        Time after sunset to turn the light off and close the activity window,
+        as H:MM:SS (e.g. 2:30:00).
+      default: "2:30:00"
+      selector:
+        text:
+
+
+variables:
+  light_var: !input light_entity
+  timer_var: !input timer_entity
+  enable_toggle_var: !input enable_toggle
+  hold_minutes_var: !input hold_minutes
+  hold_minutes_helper_var: !input hold_minutes_helper
+  extend_seconds_var: !input extend_seconds
+  active_brightness_var: !input active_brightness_pct
+  idle_action_var: !input idle_action
+  idle_brightness_var: !input idle_brightness_pct
+  use_sunset_schedule_var: !input use_sunset_schedule
+  sunset_on_offset_var: !input sunset_on_offset
+  sunset_off_offset_var: !input sunset_off_offset
+
+  # Effective hold, in minutes: the optional input_number wins when set.
+  hold_mins: >-
+    {% if hold_minutes_helper_var | count > 0 %}
+      {{ states(hold_minutes_helper_var[0]) | int(hold_minutes_var | int(15)) }}
+    {% else %}
+      {{ hold_minutes_var | int(15) }}
+    {% endif %}
+
+  # Enable gate: no helper configured means always enabled.
+  enabled: >-
+    {{ enable_toggle_var | count == 0 or is_state(enable_toggle_var[0], 'on') }}
+
+  # Activity window. With no sunset schedule the window is always open;
+  # otherwise it runs from today's sunset + on offset to sunset + off offset.
+  # Today's sunset is next_setting - 24h once the sun is already down.
+  in_window: >-
+    {% if not (use_sunset_schedule_var | bool(true)) %}
+      true
+    {% else %}
+      {% set on_p = sunset_on_offset_var | replace('-', '') | split(':') | map('int') | list %}
+      {% set on_s = (on_p[0] * 3600 + on_p[1] * 60 + (on_p[2] if on_p | count > 2 else 0))
+                    * (-1 if sunset_on_offset_var.startswith('-') else 1) %}
+      {% set off_p = sunset_off_offset_var | replace('-', '') | split(':') | map('int') | list %}
+      {% set off_s = (off_p[0] * 3600 + off_p[1] * 60 + (off_p[2] if off_p | count > 2 else 0))
+                     * (-1 if sunset_off_offset_var.startswith('-') else 1) %}
+      {% set next_set = state_attr('sun.sun', 'next_setting') | as_datetime | as_local %}
+      {% set sunset = next_set - timedelta(hours=24)
+                      if states('sun.sun') == 'below_horizon' else next_set %}
+      {{ now() >= sunset + timedelta(seconds=on_s)
+         and now() < sunset + timedelta(seconds=off_s) }}
+    {% endif %}
+
+
+triggers:
+  - trigger: state
+    entity_id: !input activity_sensors
+    to: "on"
+    id: activity
+
+  - trigger: state
+    entity_id: !input timer_entity
+    to: idle
+    id: expired
+
+  - trigger: sun
+    event: sunset
+    offset: !input sunset_on_offset
+    id: sunset_on
+
+  - trigger: sun
+    event: sunset
+    offset: !input sunset_off_offset
+    id: sunset_off
+
+
+conditions: []
+
+
+actions:
+  - choose:
+
+      # Activity: brighten, then start the hold timer or extend a running one.
+      - alias: "Activity detected"
+        conditions:
+          - condition: trigger
+            id: activity
+          - condition: template
+            value_template: "{{ enabled }}"
+          - condition: template
+            value_template: "{{ in_window }}"
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: !input light_entity
+            data:
+              brightness_pct: "{{ active_brightness_var | int(40) }}"
+
+          - if:
+              - condition: template
+                value_template: "{{ is_state(timer_var, 'active') }}"
+            then:
+              # timer.change is rejected if it would push the remaining time past
+              # the duration the timer was started with, so add only the headroom
+              # that is actually left.
+              - variables:
+                  extend_by: >-
+                    {% set d = (state_attr(timer_var, 'duration') | default('0:00:00', true))
+                               | split(':') | map('int') | list %}
+                    {% set attr_total = d[0] * 3600 + d[1] * 60 + d[2] %}
+                    {% set total = [hold_mins | int * 60, attr_total] | min %}
+                    {% set remaining = (state_attr(timer_var, 'finishes_at')
+                                        | as_datetime - now()).total_seconds() | round(0) | int %}
+                    {{ [extend_seconds_var | int(60), total - remaining] | min }}
+              - condition: template
+                value_template: "{{ extend_by | int(0) > 0 }}"
+              - action: timer.change
+                target:
+                  entity_id: !input timer_entity
+                data:
+                  duration: "{{ '00:00:%02d' % (extend_by | int) }}"
+            else:
+              - action: timer.start
+                target:
+                  entity_id: !input timer_entity
+                data:
+                  duration: >-
+                    {{ '%02d:%02d:00' % (hold_mins | int // 60, hold_mins | int % 60) }}
+
+      # Hold expired: dim back to idle, or turn off.
+      # Dimming outside the schedule window would switch the light back on, so
+      # anything outside the window turns off regardless of the idle action.
+      - alias: "Hold timer expired"
+        conditions:
+          - condition: trigger
+            id: expired
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ idle_action_var == 'dim' and in_window }}"
+            then:
+              - action: light.turn_on
+                target:
+                  entity_id: !input light_entity
+                data:
+                  brightness_pct: "{{ idle_brightness_var | int(20) }}"
+            else:
+              - action: light.turn_off
+                target:
+                  entity_id: !input light_entity
+
+      # Scheduled on at sunset, at idle brightness.
+      - alias: "Sunset on"
+        conditions:
+          - condition: trigger
+            id: sunset_on
+          - condition: template
+            value_template: "{{ use_sunset_schedule_var | bool(true) }}"
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: !input light_entity
+            data:
+              brightness_pct: "{{ idle_brightness_var | int(20) }}"
+
+      # Scheduled off: cancel any hold so its expiry cannot re-light the light.
+      - alias: "Sunset off"
+        conditions:
+          - condition: trigger
+            id: sunset_off
+          - condition: template
+            value_template: "{{ use_sunset_schedule_var | bool(true) }}"
+        sequence:
+          - action: timer.cancel
+            target:
+              entity_id: !input timer_entity
+          - action: light.turn_off
+            target:
+              entity_id: !input light_entity
+
+
+mode: queued
+max: 10
+max_exceeded: silent
