@@ -8,10 +8,10 @@ blueprint:
     sunset + an end offset.
     Replaces the usual cluster of separate "turn on at sunset", "brighten on
     motion", "extend timer", "timer expired" and "turn off" automations.
-    Requires three helpers per instance, created at
+    Requires four helpers per instance, created at
     Settings > Devices & Services > Helpers:
-    a Timer (the hold countdown), a Number (hold duration in minutes) and a
-    Toggle (enables the timer behaviour).
+    a Timer (the hold countdown), a Number (hold duration in minutes) and two
+    Toggles (one enables the timer behaviour, one enables the sunset schedule).
   domain: automation
   source_url: https://community.home-assistant.io/
 
@@ -39,7 +39,7 @@ blueprint:
     timer_entity:
       name: Hold Timer Helper
       description: >-
-        Helper 1 of 3. The Timer helper this instance owns - the hold countdown.
+        Helper 1 of 4. The Timer helper this instance owns - the hold countdown.
         Use a unique helper per instance; create at
         Settings > Devices & Services > Helpers > Timer.
         Its own configured duration is irrelevant; this blueprint always starts it
@@ -52,7 +52,7 @@ blueprint:
     hold_minutes_helper:
       name: Hold Duration Helper
       description: >-
-        Helper 2 of 3. An input_number holding the hold duration in minutes, so it
+        Helper 2 of 4. An input_number holding the hold duration in minutes, so it
         can be changed from a dashboard without editing the automation.
         Create at Settings > Devices & Services > Helpers > Number.
         Falls back to 15 minutes if the helper is unavailable.
@@ -64,7 +64,7 @@ blueprint:
     enable_toggle:
       name: Enable Toggle
       description: >-
-        Helper 3 of 3. An input_boolean that enables the timer behaviour. While it
+        Helper 3 of 4. An input_boolean that enables the timer behaviour. While it
         is off, activity sensors are ignored and the light is left at whatever the
         sunset schedule set. Create at
         Settings > Devices & Services > Helpers > Toggle.
@@ -129,16 +129,19 @@ blueprint:
           unit_of_measurement: "%"
           mode: slider
 
-    use_sunset_schedule:
-      name: Use Sunset Schedule
+    sunset_schedule_toggle:
+      name: Sunset Schedule Toggle
       description: >-
-        When ON, the light turns on at idle brightness at sunset + Sunset On
-        Offset, turns off at sunset + Sunset Off Offset, and activity sensors are
-        ignored outside that window.
-        When OFF, there is no schedule and activity sensors run at any hour.
-      default: true
+        Helper 4 of 4. An input_boolean that enables the sunset schedule.
+        While it is on, the light turns on at idle brightness at sunset + Sunset
+        On Offset, turns off at sunset + Sunset Off Offset, and activity sensors
+        are ignored outside that window.
+        While it is off, there is no schedule at all and activity sensors run at
+        any hour. Create at Settings > Devices & Services > Helpers > Toggle.
       selector:
-        boolean:
+        entity:
+          filter:
+            domain: input_boolean
 
     sunset_on_offset:
       name: Sunset On Offset
@@ -168,7 +171,7 @@ variables:
   active_brightness_var: !input active_brightness_pct
   idle_action_var: !input idle_action
   idle_brightness_var: !input idle_brightness_pct
-  use_sunset_schedule_var: !input use_sunset_schedule
+  sunset_schedule_var: !input sunset_schedule_toggle
   sunset_on_offset_var: !input sunset_on_offset
   sunset_off_offset_var: !input sunset_off_offset
 
@@ -178,14 +181,15 @@ variables:
     {% set m = states(hold_minutes_helper_var) | int(0) %}
     {{ m if m > 0 else 15 }}
 
-  # Enable gate.
+  # Enable gates.
   enabled: "{{ is_state(enable_toggle_var, 'on') }}"
+  schedule_on: "{{ is_state(sunset_schedule_var, 'on') }}"
 
   # Activity window. With no sunset schedule the window is always open;
   # otherwise it runs from today's sunset + on offset to sunset + off offset.
   # Today's sunset is next_setting - 24h once the sun is already down.
   in_window: >-
-    {% if not (use_sunset_schedule_var | bool(true)) %}
+    {% if not is_state(sunset_schedule_var, 'on') %}
       true
     {% else %}
       {% set on_p = sunset_on_offset_var | replace('-', '') | split(':') | map('int') | list %}
@@ -305,7 +309,7 @@ actions:
           - condition: trigger
             id: sunset_on
           - condition: template
-            value_template: "{{ use_sunset_schedule_var | bool(true) }}"
+            value_template: "{{ schedule_on }}"
         sequence:
           - action: light.turn_on
             target:
@@ -319,7 +323,7 @@ actions:
           - condition: trigger
             id: sunset_off
           - condition: template
-            value_template: "{{ use_sunset_schedule_var | bool(true) }}"
+            value_template: "{{ schedule_on }}"
         sequence:
           - action: timer.cancel
             target:
