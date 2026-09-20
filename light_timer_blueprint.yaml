@@ -232,12 +232,12 @@ variables:
   # Today's sunset is next_setting - 24h once the sun is already down.
   in_window: >-
     {% if not is_state(sunset_schedule_var, 'on') %}
-      true
+      {{ true }}
     {% else %}
-      {% set on_p = sunset_on_offset_var | replace('-', '') | split(':') | map('int') | list %}
+      {% set on_p = (sunset_on_offset_var | replace('-', '')).split(':') | map('int') | list %}
       {% set on_s = (on_p[0] * 3600 + on_p[1] * 60 + (on_p[2] if on_p | count > 2 else 0))
                     * (-1 if sunset_on_offset_var.startswith('-') else 1) %}
-      {% set off_p = sunset_off_offset_var | replace('-', '') | split(':') | map('int') | list %}
+      {% set off_p = (sunset_off_offset_var | replace('-', '')).split(':') | map('int') | list %}
       {% set off_s = (off_p[0] * 3600 + off_p[1] * 60 + (off_p[2] if off_p | count > 2 else 0))
                      * (-1 if sunset_off_offset_var.startswith('-') else 1) %}
       {% set next_set = state_attr('sun.sun', 'next_setting') | as_datetime | as_local %}
@@ -322,7 +322,7 @@ actions:
               - variables:
                   extend_by: >-
                     {% set d = (state_attr(timer_var, 'duration') | default('0:00:00', true))
-                               | split(':') | map('int') | list %}
+                               .split(':') | map('int') | list %}
                     {% set attr_total = d[0] * 3600 + d[1] * 60 + d[2] %}
                     {% set total = [hold_mins | int * 60, attr_total] | min %}
                     {% set remaining = (state_attr(timer_var, 'finishes_at')
