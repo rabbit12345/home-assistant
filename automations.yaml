@@ -1,0 +1,2077 @@
+- id: '1718931144797'
+  alias: study dyson fan auto on solar surplus
+  description: turn on study dyson fan during solar surplus
+  trigger:
+  - platform: state
+    entity_id:
+    - sensor.power_net_consumption
+  condition:
+  - condition: state
+    entity_id: input_boolean.auto_dyson_heater
+    state: 'on'
+  - condition: device
+    device_id: c53153e4ea9d17caa0b98660161e99e4
+    domain: fan
+    entity_id: 030d299e705be6464e97d876d849b434
+    type: is_off
+  - condition: numeric_state
+    entity_id: sensor.power_net_consumption
+    below: -2000
+  action:
+  - service: fan.turn_on
+    target:
+      device_id:
+      - c53153e4ea9d17caa0b98660161e99e4
+    data: {}
+  mode: single
+- id: '1718932786942'
+  alias: study dyson fan auto off
+  description: turn off study dyson fan during solar deficit
+  trigger:
+  - platform: numeric_state
+    entity_id:
+    - sensor.power_net_consumption
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 0
+    above: -499
+  condition:
+  - condition: state
+    entity_id: input_boolean.auto_dyson_heater
+    state: 'on'
+  - condition: device
+    device_id: c53153e4ea9d17caa0b98660161e99e4
+    domain: fan
+    entity_id: 030d299e705be6464e97d876d849b434
+    type: is_on
+  action:
+  - service: fan.turn_off
+    target:
+      device_id:
+      - c53153e4ea9d17caa0b98660161e99e4
+    data: {}
+  mode: single
+- id: '1718934304343'
+  alias: bedroom dyson fan auto on solar surplus
+  description: turn on bedroom dyson fan during solar surplus when study dyson is
+    also on
+  trigger:
+  - platform: state
+    entity_id:
+    - sensor.power_net_consumption
+  condition:
+  - condition: state
+    entity_id: input_boolean.auto_dyson_heater
+    state: 'on'
+  - condition: device
+    device_id: 3a0f0efbebc0ba6eebfc145d29b95226
+    domain: fan
+    entity_id: 1f603b383ec2399a7625ffbcb4a7d6db
+    type: is_off
+  - condition: device
+    device_id: c53153e4ea9d17caa0b98660161e99e4
+    domain: fan
+    entity_id: 030d299e705be6464e97d876d849b434
+    type: is_on
+  - condition: numeric_state
+    entity_id: sensor.power_net_consumption
+    below: -2000
+  action:
+  - service: fan.turn_on
+    data: {}
+    target:
+      device_id: 3a0f0efbebc0ba6eebfc145d29b95226
+  mode: single
+- id: '1718934845462'
+  alias: bedroom dyson fan auto off
+  description: turn off bedroom dyson fan during solar deficit when study dyson is
+    on
+  trigger:
+  - platform: numeric_state
+    entity_id:
+    - sensor.power_net_consumption
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 0
+    above: -499
+  condition:
+  - condition: state
+    entity_id: input_boolean.auto_dyson_heater
+    state: 'on'
+  - condition: device
+    device_id: c53153e4ea9d17caa0b98660161e99e4
+    domain: fan
+    entity_id: 030d299e705be6464e97d876d849b434
+    type: is_on
+  - condition: device
+    device_id: 3a0f0efbebc0ba6eebfc145d29b95226
+    domain: fan
+    entity_id: 1f603b383ec2399a7625ffbcb4a7d6db
+    type: is_on
+  action:
+  - service: fan.turn_off
+    data: {}
+    target:
+      device_id: 3a0f0efbebc0ba6eebfc145d29b95226
+  mode: single
+- id: '1731042044930'
+  alias: actron AC auto on
+  description: 'turn on actorn air conditioner during solar surplus: 6000Wh'
+  triggers:
+  - entity_id:
+    - sensor.power_net_consumption
+    trigger: state
+  conditions:
+  - condition: state
+    entity_id: input_boolean.auto_actron_ac
+    state: 'on'
+  - condition: state
+    entity_id: switch.actron_power_2
+    state: 'off'
+  - condition: numeric_state
+    entity_id: sensor.power_net_consumption
+    below: -3500
+  actions:
+  - action: switch.turn_on
+    metadata: {}
+    data: {}
+    target:
+      entity_id: switch.actron_power_2
+  mode: single
+- id: '1731043481806'
+  alias: actron AC auto off
+  description: turn off actron air conditioner during solar generation deficit
+  triggers:
+  - entity_id:
+    - sensor.power_net_consumption
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 0
+    above: -499
+    trigger: numeric_state
+  conditions:
+  - condition: state
+    entity_id: input_boolean.auto_actron_ac
+    state: 'on'
+  - condition: state
+    entity_id: switch.actron_power_2
+    state: 'on'
+  actions:
+  - action: switch.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: switch.actron_power_2
+  mode: single
+- id: '1743900455683'
+  alias: daily midnight reboot
+  description: ''
+  triggers:
+  - trigger: time
+    at: 00:00:00
+  conditions: []
+  actions:
+  - action: hassio.host_reboot
+    metadata: {}
+    data: {}
+  mode: single
+- alias: SET pushover state TO fibaro global variable
+  trigger:
+    platform: state
+    entity_id: input_boolean.fibaro_pushover
+  action:
+    service: rest_command.set_fibaro_var
+    data:
+      var: sendPushover
+      value: '{{ trigger.to_state.state }}'
+  id: 020fd14152cb4bbea5b282eb49397273
+- id: e0f37ae783c74dab838af086178292df
+  alias: GET pushover state FROM fibaro
+  triggers:
+  - entity_id: sensor.fibaro_pushOver_state
+    trigger: state
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: sensor.fibaro_pushover_state
+        state: 'on'
+      sequence:
+      - action: input_boolean.turn_on
+        data: {}
+        target:
+          entity_id: input_boolean.fibaro_pushover
+    - conditions:
+      - condition: state
+        entity_id: sensor.fibaro_pushover_state
+        state: 'off'
+      sequence:
+      - action: input_boolean.turn_off
+        target:
+          entity_id:
+          - input_boolean.fibaro_pushover
+        data: {}
+- id: '1744932422243'
+  alias: UPDATE pushover state TO fibaro VD
+  description: ''
+  triggers:
+  - entity_id:
+    - input_boolean.fibaro_pushover
+    trigger: state
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: input_boolean.fibaro_pushover
+        state: 'on'
+      sequence:
+      - action: rest_command.fibaro_virtualdevice_pushover_state_send
+        data: {}
+    - conditions:
+      - condition: state
+        entity_id: input_boolean.fibaro_pushover
+        state: 'off'
+      sequence:
+      - action: input_boolean.turn_off
+        metadata: {}
+        data: {}
+        target:
+          entity_id: input_boolean.fibaro_pushover
+      - action: rest_command.fibaro_virtualdevice_pushover_state_stop
+        metadata: {}
+        data: {}
+  mode: single
+- id: '1745665667446'
+  alias: Backyard Light - After Sunset
+  description: ''
+  use_blueprint:
+    path: Blackshome/sensor-light.yaml
+    input:
+      motion_trigger:
+      - binary_sensor.kitchen_door_sensor_door
+      light_switch:
+        entity_id:
+        - light.walkway_light
+        - light.garden_light
+        - light.backyard_light_switch
+      include_night_lights: night_lights_disabled
+      night_lights_sun_elevation: -1
+      include_sun: sun_enabled
+      sun_elevation: 0
+      night_lights:
+        entity_id:
+        - light.walkway_light
+        - light.backyard_light_switch
+      night_time_delay: 0.5
+      night_lights_conditions:
+      - sun_enabled
+      time_delay: 7
+      dynamic_lighting_lux_sensor: sensor.walkway_ms600_illuminance
+      include_dynamic_lighting: disable_dynamic_lighting
+      include_bypass: []
+      motion_bypass_lights_on: []
+      motion_bypass_lights_off: []
+      include_ambient: ambient_disabled
+      ambient_light_sensor: sensor.walkway_ms600_illuminance
+      ambient_light_options: ambient_light_option_enabled
+      boolean_scenes_scripts: input_boolean.back_yard_light_timer_switch
+      include_device_tracker: device_tracker_disabled
+      night_boolean_scenes_scripts: input_boolean.back_yard_light_timer_switch
+- id: '1746322036007'
+  alias: garage dehumidify auto off
+  description: turn off actron air conditioner during solar deficit
+  triggers:
+  - entity_id:
+    - sensor.power_net_consumption
+    for:
+      hours: 0
+      minutes: 3
+      seconds: 0
+    above: -499
+    trigger: numeric_state
+  conditions:
+  - condition: state
+    entity_id: input_boolean.auto_garage_dehumidify
+    state: 'on'
+  - condition: state
+    entity_id: humidifier.garage_dehumidifier
+    state: 'on'
+  actions:
+  - action: humidifier.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: humidifier.garage_dehumidifier
+  mode: single
+- id: '1746322436726'
+  alias: garage dehumidify auto on
+  description: 'turn on garage dehumidify during solar surplus: 5000Wh'
+  triggers:
+  - entity_id:
+    - sensor.power_net_consumption
+    trigger: state
+  conditions:
+  - condition: state
+    entity_id: input_boolean.auto_garage_dehumidify
+    state: 'on'
+  - condition: state
+    entity_id: humidifier.garage_dehumidifier
+    state: 'off'
+  - condition: numeric_state
+    entity_id: sensor.power_net_consumption
+    below: -2000
+  actions:
+  - action: humidifier.toggle
+    metadata: {}
+    data: {}
+    target:
+      entity_id: humidifier.garage_dehumidifier
+  mode: single
+- id: '1746323053032'
+  alias: garage turn off dehumidify with garage auto dehumidify off
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_boolean.auto_garage_dehumidify
+    from: 'on'
+    to: 'off'
+  conditions:
+  - condition: state
+    entity_id: humidifier.garage_dehumidifier
+    state: 'on'
+  actions:
+  - action: humidifier.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: humidifier.garage_dehumidifier
+  mode: single
+- id: '1746323714120'
+  alias: piano room dehumidify auto off
+  description: turn off piano room dehumidifier during solar deficit
+  triggers:
+  - entity_id:
+    - sensor.power_net_consumption
+    for:
+      hours: 0
+      minutes: 3
+      seconds: 0
+    above: 1000
+    trigger: numeric_state
+  conditions:
+  - condition: state
+    entity_id: input_boolean.auto_piano_room_dehumidify
+    state: 'on'
+  - condition: device
+    type: is_on
+    device_id: 5259c9efeab9140d7b1775e020f754d5
+    entity_id: fc583b000de71f2ec160723bb03650f7
+    domain: switch
+  actions:
+  - type: turn_off
+    device_id: 5259c9efeab9140d7b1775e020f754d5
+    entity_id: fc583b000de71f2ec160723bb03650f7
+    domain: switch
+  mode: single
+- id: '1746323808108'
+  alias: piano room dehumidify auto on
+  description: 'turn on piano room dehumidify during solar surplus: 5000Wh'
+  triggers:
+  - entity_id:
+    - sensor.power_net_consumption
+    trigger: state
+  conditions:
+  - condition: state
+    entity_id: input_boolean.auto_piano_room_dehumidify
+    state: 'on'
+  - condition: numeric_state
+    entity_id: sensor.power_net_consumption
+    below: 100
+  - condition: device
+    type: is_off
+    device_id: 5259c9efeab9140d7b1775e020f754d5
+    entity_id: fc583b000de71f2ec160723bb03650f7
+    domain: switch
+    for:
+      hours: 0
+      minutes: 5
+      seconds: 0
+  actions:
+  - action: switch.turn_on
+    metadata: {}
+    target:
+      device_id: 5259c9efeab9140d7b1775e020f754d5
+    data: {}
+  mode: single
+- id: '1746861402085'
+  alias: Low Battery Notifications
+  description: ''
+  use_blueprint:
+    path: Blackshome/low-battery-notifications-and-actions.yaml
+    input:
+      include_button: enable_button_trigger
+      button_entity: input_button.check_device_battery
+      include_time: time_enabled
+      include_easy_notify: enable_easy_notify
+      notify_device:
+      - 47f6c393e01254db8b79be8e29ad7b7f
+      - 9cb0c96fe41b323ed5e949e909fa4075
+      - d160d747f94128f88187d2a7455762b2
+      - 5e6a38755fd814ba4cbf32cc6c422c0a
+      - 0149f08451aafc137be6596de21ae4cc
+- id: '1747369767129'
+  alias: Garage Dehumidifier ON with Timer On
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - humidifier.garage_dehumidifier
+    from:
+    - 'off'
+    to:
+    - 'on'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.auto_garage_dehumidify
+    state: 'off'
+  - condition: state
+    entity_id: input_boolean.garage_dehumidifier_timer_switch
+    state: 'on'
+  actions:
+  - action: timer.start
+    metadata: {}
+    data:
+      duration: '{% set mins = states(''input_number.garage_dehumidifier_timer_input'')
+        | int %} 00:{{ ''%02d'' % mins }}:00
+
+        '
+    target:
+      entity_id: timer.garage_dehumidifier_timer
+  mode: single
+- id: '1747378318831'
+  alias: Garage Dehumidifier OFF with Timer On
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - humidifier.garage_dehumidifier
+    from:
+    - 'on'
+    to:
+    - 'off'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.auto_garage_dehumidify
+    state: 'off'
+  - condition: state
+    entity_id: input_boolean.garage_dehumidifier_timer_switch
+    state: 'on'
+  actions:
+  - action: timer.finish
+    metadata: {}
+    data: {}
+    target:
+      entity_id: timer.garage_dehumidifier_timer
+  mode: single
+- id: '1747386937625'
+  alias: Piano Room Dehumidifier OFF with Timer On
+  description: ''
+  triggers:
+  - type: turned_off
+    device_id: 5259c9efeab9140d7b1775e020f754d5
+    entity_id: fc583b000de71f2ec160723bb03650f7
+    domain: switch
+    trigger: device
+  conditions:
+  - condition: state
+    entity_id: input_boolean.auto_piano_room_dehumidify
+    state: 'off'
+  - condition: state
+    entity_id: input_boolean.piano_room_dehumidifier_timer_switch
+    state: 'on'
+  actions:
+  - action: timer.finish
+    metadata: {}
+    data: {}
+    target:
+      entity_id: timer.piano_room_dehumidifier_timer
+  mode: single
+- id: '1747393301095'
+  alias: Garage Light Timer Expired
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - timer.garage_light_timer
+    to: idle
+  conditions: []
+  actions:
+  - action: light.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: light.garage_light
+  mode: single
+- id: '1747393624555'
+  alias: Garage Light ON with Timer On & Garage Door Open
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.garage_door_door
+    to:
+    - 'on'
+    from:
+    - 'off'
+  - trigger: state
+    entity_id:
+    - binary_sensor.garage_entry_door
+    to:
+    - 'on'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.garage_light_timer_switch
+    state: 'on'
+  actions:
+  - action: timer.start
+    metadata: {}
+    data:
+      duration: '{% set mins = states(''input_number.garage_light_timer_input'') |
+        int %} 00:{{ ''%02d'' % mins }}:00
+
+        '
+    target:
+      entity_id: timer.garage_light_timer
+  - action: light.turn_on
+    metadata: {}
+    data: {}
+    target:
+      entity_id: light.garage_light
+  mode: single
+- id: '1747395664210'
+  alias: Garage Light Timer Increase By Trackmix Motion Detection
+  description: ''
+  triggers:
+  - type: motion
+    device_id: 3cef2dee2cf067520d0378be50d35928
+    entity_id: 4b6b9d8c85ddf5d91de52e27c1d803ed
+    domain: binary_sensor
+    trigger: device
+  - trigger: state
+    entity_id:
+    - binary_sensor.garage_trackmix_person
+    to: 'on'
+  - trigger: state
+    entity_id:
+    - binary_sensor.garage_ms600_occupancy
+    to: 'on'
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 5
+  - trigger: state
+    entity_id:
+    - binary_sensor.garage_entry_door
+    from:
+    - 'off'
+    to:
+    - 'on'
+  conditions:
+  - condition: state
+    entity_id: timer.garage_light_timer
+    state: active
+  actions:
+  - action: timer.change
+    metadata: {}
+    data:
+      duration: 00:01:00
+    target:
+      entity_id: timer.garage_light_timer
+  mode: single
+- id: '1747530084942'
+  alias: Garage Door Open Alert TO Pushover
+  description: ''
+  use_blueprint:
+    path: pavax/nagging_alert_notification.yaml
+    input:
+      sensor_entity: binary_sensor.garage_door_door
+      initial_delay: 0
+      repeat_delay: 120
+      max_alerts: 61
+      notify_device: d160d747f94128f88187d2a7455762b2
+      notify_message: '{{ entity_name }} - OPENED'
+      resolved_message: '{{ entity_name }} - CLOSED'
+      alert_action:
+      - action: notify.pushover
+        metadata: {}
+        data:
+          message: '{{ states.binary_sensor.garage_door_sensor.name }} IS OPEN for
+            {{ relative_time(states.binary_sensor.garage_door_sensor.last_changed)
+            }}
+
+            '
+          title: '{{ states.binary_sensor.garage_door_sensor.name }} - OPENED'
+      condition_entity: input_boolean.fibaro_pushover
+      resolved_action:
+      - action: notify.pushover
+        metadata: {}
+        data:
+          message: '{{ states.binary_sensor.garage_door_sensor.name }} IS CLOSED'
+          title: '{{ states.binary_sensor.garage_door_sensor.name }} - CLOSED'
+      alert_state: 'on'
+- id: '1754809429271'
+  alias: Petrol price update - Costco Auburn
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.costco_auburn_p98
+  - trigger: time_pattern
+    hours: /1
+  - trigger: numeric_state
+    entity_id:
+    - sensor.eei12e_fuel_level
+    - sensor.ehd70x_fuel_level
+    above: 0
+    below: 100
+  conditions: []
+  actions:
+  - action: input_number.set_value
+    metadata: {}
+    data:
+      value: '{{ ''{:.2f}''.format((states.sensor.costco_auburn_p98.state | float(2)
+        / 100 * 66 * (100 - states.sensor.eei12e_fuel_level.state | float(2)) / 100.0
+        )) }}'
+    target:
+      entity_id: input_number.petrol_price_to_add_c300
+  - action: input_number.set_value
+    metadata: {}
+    data:
+      value: '{{ ''{:.2f}''.format((states.sensor.costco_auburn_p98.state | float(2)
+        /100 * 85 * (100 - states.sensor.ehd70x_fuel_level.state | float(2)) / 100.0))
+        }}'
+    target:
+      entity_id: input_number.petrol_price_to_add_gle450
+  mode: single
+- id: '1755953015221'
+  alias: Laundry LED TURN ON at Sunset
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunset
+    offset: '-1:00:00'
+  conditions: []
+  actions:
+  - parallel:
+    - type: turn_on
+      device_id: 7124a319badb9e2e48d37cd82974ac3c
+      entity_id: 4dbc2ca2683cbc2d4fbe2838739da1a2
+      domain: light
+      brightness_pct: 15
+    - action: light.turn_on
+      metadata: {}
+      data:
+        brightness_pct: 25
+      target:
+        entity_id: light.cabinet_well_led
+    - action: wled_liveviewproxy.send_command
+      metadata: {}
+      data:
+        command:
+          seg:
+          - id: 0
+            col:
+            - w: 255
+          - id: 1
+            col:
+            - w: 255
+          - id: 2
+            col:
+            - w: 255
+        targets:
+          device_id:
+          - cd5f4af07329ccfe26a6ca3e5b60830a
+          - 4df8c926e6260dccdead6737d06e3ffb
+      response_variable: WLED-LIVE
+  mode: single
+- id: '1755953418631'
+  alias: Laundry LED TURN OFF at Sunrise
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunrise
+    offset: '1:00:00'
+  - trigger: time
+    at: sensor.strathfield_astronomical_sunrise_time_0
+  conditions: []
+  actions:
+  - parallel:
+    - type: turn_off
+      device_id: 7124a319badb9e2e48d37cd82974ac3c
+      entity_id: 4dbc2ca2683cbc2d4fbe2838739da1a2
+      domain: light
+    - action: light.turn_off
+      metadata: {}
+      data: {}
+      target:
+        entity_id: light.cabinet_well_led
+  mode: single
+- id: '1755954583786'
+  alias: Laundry LED Timer Expired
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - timer.laundry_led_timer
+    to: idle
+  conditions: []
+  actions:
+  - type: turn_on
+    device_id: 7124a319badb9e2e48d37cd82974ac3c
+    entity_id: 4dbc2ca2683cbc2d4fbe2838739da1a2
+    domain: light
+    brightness_pct: 15
+  - type: turn_on
+    device_id: 34f8be4db6103c643deaca5639081dbe
+    entity_id: 3f96fb4de4f6a50afb82c63f5eaf3958
+    domain: light
+    brightness_pct: 15
+  mode: single
+- id: '1755955026496'
+  alias: Laundry LED ON with Timer On & Motion Detected & 1hr Before Sunset
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.laundry_motioneye
+    to: 'on'
+  conditions:
+  - condition: and
+    conditions:
+    - condition: state
+      entity_id: input_boolean.laundry_led_timer_switch
+      state: 'on'
+    - condition: or
+      conditions:
+      - condition: sun
+        before: sunrise
+        before_offset: '1:00:00'
+      - condition: sun
+        after: sunset
+        after_offset: '-1:00:00'
+  actions:
+  - action: timer.start
+    metadata: {}
+    data:
+      duration: '{% set mins = states(''input_number.laundry_led_timer_input'') |
+        int %} 00:{{ ''%02d'' % mins }}:00
+
+        '
+    target:
+      entity_id:
+      - timer.laundry_led_timer
+  - alias: WLED Live View Proxy penta mini 1 & 2  'Send Command'
+    action: wled_liveviewproxy.send_command
+    metadata: {}
+    data:
+      command:
+        bri: 255
+        seg:
+        - id: 0
+          col:
+          - w: 255
+        - id: 1
+          col:
+          - w: 255
+        - id: 2
+          col:
+          - w: 255
+      targets:
+        device_id:
+        - 4df8c926e6260dccdead6737d06e3ffb
+        - cd5f4af07329ccfe26a6ca3e5b60830a
+    response_variable: WLED-LIVE
+    enabled: true
+  - action: light.turn_on
+    metadata: {}
+    data:
+      brightness_pct: 30
+    target:
+      entity_id:
+      - light.wled_penta_mini_1_main
+  - action: light.turn_on
+    metadata: {}
+    data:
+      brightness_pct: 30
+    target:
+      entity_id:
+      - light.cabinet_well_led
+  mode: single
+- id: '1756550746317'
+  alias: Cabinet LED ON with Cabinet Door Open
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.network_cabinet_sensor_contact
+    from: 'off'
+    to: 'on'
+  - trigger: state
+    entity_id:
+    - binary_sensor.network_cabinet_sensor_contact
+    from: unavailable
+    to: 'on'
+  conditions: []
+  actions:
+  - action: light.turn_on
+    metadata: {}
+    data:
+      brightness_pct: 85
+      transition: 1
+    target:
+      entity_id: light.network_cabinet_led
+  - type: turn_off
+    device_id: 34f8be4db6103c643deaca5639081dbe
+    entity_id: 3f96fb4de4f6a50afb82c63f5eaf3958
+    domain: light
+    enabled: false
+  - action: wled_liveviewproxy.send_command
+    data:
+      targets:
+        device_id: 4df8c926e6260dccdead6737d06e3ffb
+      command:
+        bri: 255
+        seg:
+        - id: 1
+          col:
+          - w: 255
+    response_variable: WLED-LIVE
+  mode: single
+- id: '1756553108755'
+  alias: Cabinet LED OFF with Cabinet Door Closed
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.network_cabinet_sensor_contact
+    from: 'on'
+    to: 'off'
+  conditions: []
+  actions:
+  - action: light.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: light.network_cabinet_led
+  mode: single
+- id: '1757669284387'
+  alias: Kitchen LED ON with Timer On & Motion Detected & 1hr Before Sunset
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.satel_kitchen_motion
+    to: 'on'
+  conditions:
+  - condition: and
+    conditions:
+    - condition: state
+      entity_id: input_boolean.kitchen_led_timer_switch
+      state: 'on'
+    - condition: or
+      conditions:
+      - condition: sun
+        before: sunrise
+        before_offset: '1:00:00'
+      - condition: sun
+        after: sunset
+        after_offset: '-1:00:00'
+  actions:
+  - alias: WLED Live View Proxy deca 1 'Send Command'
+    action: wled_liveviewproxy.send_command
+    metadata: {}
+    data:
+      command:
+        seg:
+        - id: 0
+          cct: 10
+          col:
+          - w: 255
+        - id: 1
+          cct: 10
+          col:
+          - w: 255
+      targets:
+        device_id:
+        - 87397fe77fc3a457667b7f097d785f82
+    response_variable: WLED-LIVE
+    enabled: false
+  - action: timer.start
+    metadata: {}
+    data:
+      duration: '{% set mins = states(''input_number.kitchen_led_timer_input'') |
+        int %} 00:{{ ''%02d'' % mins }}:00
+
+        '
+    target:
+      entity_id:
+      - timer.kitchen_led_timer
+  - action: light.turn_on
+    metadata: {}
+    data:
+      color_temp_kelvin: 2227
+      brightness_pct: 100
+    target:
+      entity_id:
+      - light.wled_penta_deca_1_segment_0
+      - light.wled_penta_deca_1_segment_1
+  - action: light.turn_on
+    metadata: {}
+    data:
+      color_temp_kelvin: 2227
+      brightness_pct: 25
+    target:
+      entity_id: light.kitchen_led
+  mode: single
+- id: '1757669450513'
+  alias: Kitchen LED Timer Expired
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - timer.kitchen_led_timer
+    to: idle
+  conditions: []
+  actions:
+  - action: light.turn_on
+    metadata: {}
+    data:
+      color_temp_kelvin: 3939
+      brightness_pct: 10
+    target:
+      entity_id: light.kitchen_led
+  mode: single
+- id: '1757722646026'
+  alias: Kitchen LED TURN ON at Sunset
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunset
+    offset: '-1:00:00'
+  conditions: []
+  actions:
+  - parallel:
+    - action: wled_liveviewproxy.send_command
+      metadata: {}
+      data:
+        command:
+          seg:
+          - id: 0
+            col:
+            - w: 255
+          - id: 1
+            col:
+            - w: 255
+          - id: 2
+            col:
+            - w: 255
+        targets:
+          entity_id: light.wlvp_wled_penta_deca_1
+      response_variable: WLED-LIVE
+      enabled: true
+    - action: light.turn_on
+      metadata: {}
+      data:
+        color_temp_kelvin: 2227
+        brightness_pct: 100
+      target:
+        entity_id:
+        - light.wled_penta_deca_1_segment_0
+        - light.wled_penta_deca_1_segment_1
+    - action: light.turn_on
+      metadata: {}
+      data:
+        brightness_pct: 10
+      target:
+        entity_id: light.kitchen_led
+  mode: single
+- id: '1760763088078'
+  alias: Study Light Styrbar Remote
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id: event.styrbar_remote_action
+    not_from: unavailable
+    not_to: unavailable
+  actions:
+  - choose:
+    - conditions:
+      - '{{trigger.to_state.attributes.event_type == ''on''}}'
+      sequence:
+      - data:
+          entity_id:
+          - light.study_light
+          brightness_pct: 50
+        action: light.turn_on
+    - conditions:
+      - '{{trigger.to_state.attributes.button == ''on''}}'
+      - '{{trigger.to_state.attributes.event_type == ''hold''}}'
+      sequence:
+      - data:
+          entity_id:
+          - light.rose_room_light
+          - light.2nd_floor_light
+          - light.master_bedroom_light
+          brightness_pct: 100
+        action: light.turn_on
+    - conditions:
+      - condition: template
+        value_template: '{{trigger.to_state.attributes.button == ''up''}}'
+      - condition: template
+        value_template: '{{trigger.to_state.attributes.event_type == ''hold''}}'
+      sequence:
+      - action: mqtt.publish
+        metadata: {}
+        data:
+          topic: zigbee2mqtt/Bedroom/set
+          payload: '{"brightness_move": 50 }'
+    - conditions:
+      - condition: template
+        value_template: '{{trigger.to_state.attributes.button == ''down''}}'
+      - condition: template
+        value_template: '{{trigger.to_state.attributes.event_type == ''hold''}}'
+      sequence:
+      - action: mqtt.publish
+        metadata: {}
+        data:
+          topic: zigbee2mqtt/Bedroom/set
+          payload: '{"brightness_move": -50 }'
+    - conditions:
+      - condition: template
+        value_template: '{{trigger.to_state.attributes.button in (''up'', ''down'')}}'
+      - condition: template
+        value_template: '{{trigger.to_state.attributes.event_type == ''hold_release''}}'
+      sequence:
+      - action: mqtt.publish
+        metadata: {}
+        data:
+          topic: zigbee2mqtt/Bedroom/set
+          payload: '{"brightness_move": 0 }'
+    - conditions:
+      - condition: template
+        value_template: '{{trigger.to_state.attributes.event_type == ''off''}}'
+      sequence:
+      - data:
+          entity_id:
+          - light.study_light
+        action: light.turn_off
+    - conditions:
+      - condition: template
+        value_template: '{{trigger.to_state.attributes.button == ''off''}}'
+      - condition: template
+        value_template: '{{trigger.to_state.attributes.event_type == ''hold''}}'
+      sequence:
+      - data:
+          entity_id:
+          - light.rose_room_light
+          - light.2nd_floor_light
+          - light.master_bedroom_light
+        action: light.turn_off
+  initial_state: 'on'
+  mode: queued
+  max_exceeded: silent
+- id: '1761888356481'
+  alias: pushover snooze ON
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_boolean.pushover_snooze_timer_switch
+    from: 'off'
+    to: 'on'
+  conditions: []
+  actions:
+  - action: timer.start
+    metadata: {}
+    data:
+      duration: 00:30:00
+    target:
+      entity_id:
+      - timer.pushover_snooze_timer
+  - action: input_boolean.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: input_boolean.fibaro_pushover
+  mode: single
+- id: '1761888489341'
+  alias: pushover snooze OFF
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_boolean.pushover_snooze_timer_switch
+    from: 'on'
+    to: 'off'
+  conditions: []
+  actions:
+  - action: timer.finish
+    metadata: {}
+    data: {}
+    target:
+      entity_id: timer.pushover_snooze_timer
+  - action: input_boolean.turn_on
+    metadata: {}
+    data: {}
+    target:
+      entity_id: input_boolean.fibaro_pushover
+  mode: single
+- id: '1761888816694'
+  alias: pushover Timer Expired
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - timer.pushover_snooze_timer
+    to: idle
+  conditions: []
+  actions:
+  - action: input_boolean.turn_on
+    metadata: {}
+    data: {}
+    target:
+      entity_id: input_boolean.fibaro_pushover
+  - action: input_boolean.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: input_boolean.pushover_snooze_timer_switch
+  mode: single
+- id: '1767039502982'
+  alias: Frontyard LED TURN ON at Sunset
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunset
+  conditions: []
+  actions:
+  - parallel:
+    - type: turn_on
+      device_id: 7fbf2ac8a1873e2bbef3ffaae84a8d90
+      entity_id: 356a01b0d952d26f11af81e3fbb5e896
+      domain: light
+      brightness_pct: 20
+    - action: wled_liveviewproxy.send_command
+      metadata: {}
+      data:
+        command:
+          seg:
+          - id: 0
+            col:
+            - w: 255
+          - id: 1
+            col:
+            - w: 255
+          - id: 2
+            col:
+            - w: 255
+        targets:
+          device_id:
+          - 0ef3a1fa8d112ee042afc7851be873ee
+      response_variable: WLED-LIVE
+      enabled: false
+  mode: single
+- id: '1767039729529'
+  alias: Frontyard LED TURN OFF after Sunset
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunset
+    offset: '2:30:00'
+  conditions: []
+  actions:
+  - parallel:
+    - type: turn_off
+      device_id: 7fbf2ac8a1873e2bbef3ffaae84a8d90
+      entity_id: 356a01b0d952d26f11af81e3fbb5e896
+      domain: light
+  mode: single
+- id: '1767590767881'
+  alias: Frontyard Garden Light TURN ON at Sunset
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunset
+    offset: '2:00:00'
+  conditions: []
+  actions:
+  - parallel:
+    - action: light.turn_on
+      metadata: {}
+      target:
+        entity_id: light.front_yard_light
+      data:
+        brightness_pct: 20
+    - action: light.turn_on
+      metadata: {}
+      target:
+        entity_id: light.garden_light
+      data:
+        brightness_pct: 20
+  mode: single
+- id: '1767590901493'
+  alias: Frontyard Garden Light TURN OFF After Sunset
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunset
+    offset: '3:00:00'
+  conditions: []
+  actions:
+  - parallel:
+    - action: light.turn_off
+      metadata: {}
+      target:
+        entity_id:
+        - light.front_yard_light
+        - light.garden_light
+      data: {}
+  mode: single
+- id: '1767694855520'
+  alias: Away Turn ON-OFF Kitchen Light
+  description: ''
+  use_blueprint:
+    path: Blackshome/timer.yaml
+    input:
+      timer_helper: timer.away_kitchen_timer
+      entity_input:
+        entity_id: light.kitchen_hue_lights
+      trigger_one_time: '19:02:00'
+      trigger_one_duration:
+        hours: 3
+        minutes: 30
+        seconds: 0
+      include_extra_triggers:
+      - use_trigger_two
+      trigger_two_time: '23:09:00'
+      trigger_two_duration:
+        hours: 0
+        minutes: 15
+        seconds: 20
+- id: '1769032733478'
+  alias: Holiday & Away Lighting
+  description: ''
+  use_blueprint:
+    path: Blackshome/holiday-away-lighting.yaml
+    input:
+      automation_control: enable_start_end_date
+      automation_control_end_date: '2026-01-26 08:00:00'
+      trigger_selection: sun_elevation
+      sun_elevation: -3.5
+      entity_order_on: entities_on_shuffled
+      random_on_delay: 300
+      time_off_selection: earliest_latest_time_range
+      entity_order_off: entities_off_shuffled
+      random_off_delay: 300
+      entity_1: light.kitchen_hue_lights
+      entity_1_light_transition_off: 0
+      entity_2: light.2nd_floor_light
+      entity_3: light.study_hue_lights
+      entity_4: light.master_bedroom_light
+      entity_5: light.isabelle_bedroom
+      entity_6: light.cello_room_light
+      entity_7: light.rose_room_light
+      automation_control_start_date: '2026-01-24 00:00:00'
+- id: '1770977621799'
+  alias: Frontyard LED Timer Expired
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - timer.frontyard_led_timer
+    to:
+    - idle
+  conditions: []
+  actions:
+  - action: light.turn_on
+    metadata: {}
+    target:
+      device_id: 7fbf2ac8a1873e2bbef3ffaae84a8d90
+    data:
+      brightness_pct: 20
+  mode: single
+- id: '1770977852384'
+  alias: Frontyard LED Timer Increase By Gate Motion Detection & Front Gate
+  description: ''
+  triggers:
+  - type: opened
+    device_id: dfe5d6a05935bcfbd97da93f019b5601
+    entity_id: 6495ce73f3d3f2689a035325ef2fe82a
+    domain: binary_sensor
+    trigger: device
+  - trigger: state
+    entity_id:
+    - binary_sensor.front_door_motion_occupancy
+    to:
+    - 'on'
+  - trigger: state
+    entity_id:
+    - binary_sensor.frontgate_motion_occupancy
+    to:
+    - 'on'
+  conditions:
+  - condition: state
+    entity_id: timer.frontyard_led_timer
+    state:
+    - active
+  - condition: device
+    type: is_on
+    device_id: 7fbf2ac8a1873e2bbef3ffaae84a8d90
+    entity_id: 356a01b0d952d26f11af81e3fbb5e896
+    domain: light
+  actions:
+  - variables:
+      extend_seconds: '{% set d = state_attr(''timer.frontyard_led_timer'', ''duration'').split('':'')
+        | map(''int'') | list %} {% set total = d[0] * 3600 + d[1] * 60 + d[2] %}
+        {% set remaining = (state_attr(''timer.frontyard_led_timer'', ''finishes_at'')
+        | as_datetime - now()).total_seconds() | round(0) | int %} {{ [60, total -
+        remaining] | min }}'
+  - condition: template
+    value_template: '{{ extend_seconds | int > 0 }}'
+  - action: timer.change
+    metadata: {}
+    data:
+      duration: '{{ ''00:00:%02d'' % (extend_seconds | int) }}'
+    target:
+      entity_id:
+      - timer.frontyard_led_timer
+  mode: single
+- id: '1770978310358'
+  alias: Frontyard LED Brighten with Timer On & Frontyard Motion & Front Gate Open
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.frontgate_motion_occupancy
+    to:
+    - 'on'
+  - trigger: state
+    entity_id:
+    - binary_sensor.frontgate_sensor_door
+    to:
+    - 'on'
+  - trigger: state
+    entity_id:
+    - binary_sensor.front_door_motion_occupancy
+    to:
+    - 'on'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.frontyard_led_timer_switch
+    state:
+    - 'on'
+  - condition: device
+    type: is_on
+    device_id: 7fbf2ac8a1873e2bbef3ffaae84a8d90
+    entity_id: 356a01b0d952d26f11af81e3fbb5e896
+    domain: light
+  actions:
+  - action: timer.start
+    metadata: {}
+    data:
+      duration: '{% set mins = states(''input_number.frontyard_led_timer_input'')
+        | int %} 00:{{ ''%02d'' % mins }}:00
+
+        '
+    target:
+      entity_id:
+      - timer.frontyard_led_timer
+  - action: light.turn_on
+    metadata: {}
+    data:
+      brightness_pct: 40
+    target:
+      entity_id:
+      - light.wled_penta_deca_2
+  mode: single
+- id: '1771652062811'
+  alias: EMHASS run generate energy plan script On Amber price change
+  description: generate EMHASS energy plan when amber prices change
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.amber_express_wilson_general_price
+    - sensor.amber_express_wilson_feed_in_price
+    enabled: true
+  conditions:
+  - condition: state
+    entity_id:
+    - sensor.amber_express_wilson_general_price
+    - sensor.amber_express_wilson_feed_in_price
+    attribute: estimate
+    state:
+    - false
+  actions:
+  - action: script.generate_emhass_energy_plan
+    metadata: {}
+    data: {}
+  mode: single
+- id: '1771652641917'
+  alias: Actron Auto Off Timer Expired
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - timer.actron_auto_off_timer
+    to:
+    - idle
+  conditions:
+  - condition: device
+    type: is_on
+    device_id: a791a63688a15b4d1ad81e8fa02f422c
+    entity_id: 3b48d9c5f7bdb985f445d777d4692e8c
+    domain: switch
+  actions:
+  - type: turn_off
+    device_id: a791a63688a15b4d1ad81e8fa02f422c
+    entity_id: 3b48d9c5f7bdb985f445d777d4692e8c
+    domain: switch
+  mode: single
+- id: '1771653350826'
+  alias: Actron Power ON with Auto Off Timer On
+  description: ''
+  triggers:
+  - type: turned_on
+    device_id: a791a63688a15b4d1ad81e8fa02f422c
+    entity_id: 3b48d9c5f7bdb985f445d777d4692e8c
+    domain: switch
+    trigger: device
+  - trigger: state
+    entity_id:
+    - switch.actron_power_2
+    from:
+    - 'off'
+    to:
+    - 'on'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.actron_auto_off_timer_switch
+    state:
+    - 'on'
+  actions:
+  - action: timer.start
+    metadata: {}
+    data:
+      duration: '{% set mins = states(''input_number.actron_auto_off_timer_input'')
+        | int %} 00:{{ ''%02d'' % mins }}:00
+
+        '
+    target:
+      entity_id:
+      - timer.actron_auto_off_timer
+  mode: single
+- id: '1771653553696'
+  alias: Actron Power OFF with Auto Off Timer On
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - switch.actron_power_2
+    from:
+    - 'on'
+    to:
+    - 'off'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.actron_auto_off_timer_switch
+    state:
+    - 'on'
+  - condition: state
+    entity_id: switch.actron_power_2
+    state:
+    - 'off'
+  - condition: state
+    entity_id: timer.actron_auto_off_timer
+    state:
+    - active
+  actions:
+  - action: timer.finish
+    metadata: {}
+    data: {}
+    target:
+      entity_id:
+      - timer.actron_auto_off_timer
+  mode: single
+- id: '1772774893084'
+  alias: Styrbar Remote Control for Study Lights
+  description: ''
+  triggers:
+  - device_id: cd848a745352a2d5ad5fdffb6febeb6a
+    domain: mqtt
+    type: action
+    subtype: 'on'
+    id: light_on
+    trigger: device
+  - device_id: cd848a745352a2d5ad5fdffb6febeb6a
+    domain: mqtt
+    type: action
+    subtype: 'off'
+    id: light_off
+    trigger: device
+  - device_id: cd848a745352a2d5ad5fdffb6febeb6a
+    domain: mqtt
+    type: action
+    subtype: arrow_left_click
+    id: change_color_left
+    trigger: device
+  - device_id: cd848a745352a2d5ad5fdffb6febeb6a
+    domain: mqtt
+    type: action
+    subtype: arrow_left_hold
+    id: change_color_left_hold
+    trigger: device
+  - device_id: cd848a745352a2d5ad5fdffb6febeb6a
+    domain: mqtt
+    type: action
+    subtype: arrow_left_release
+    id: change_color_left_release
+    trigger: device
+  - device_id: cd848a745352a2d5ad5fdffb6febeb6a
+    domain: mqtt
+    type: action
+    subtype: arrow_right_click
+    id: change_color_right
+    trigger: device
+  - device_id: cd848a745352a2d5ad5fdffb6febeb6a
+    domain: mqtt
+    type: action
+    subtype: arrow_right_hold
+    id: change_color_right_hold
+    trigger: device
+  - device_id: cd848a745352a2d5ad5fdffb6febeb6a
+    domain: mqtt
+    type: action
+    subtype: arrow_right_release
+    id: change_color_right_release
+    trigger: device
+  - device_id: cd848a745352a2d5ad5fdffb6febeb6a
+    domain: mqtt
+    type: action
+    subtype: brightness_move_down
+    id: dim_down
+    trigger: device
+  - device_id: cd848a745352a2d5ad5fdffb6febeb6a
+    domain: mqtt
+    type: action
+    subtype: brightness_move_up
+    id: dim_up
+    trigger: device
+  - device_id: cd848a745352a2d5ad5fdffb6febeb6a
+    domain: mqtt
+    type: action
+    subtype: brightness_stop
+    id: dim_stop
+    trigger: device
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: light_on
+      sequence:
+      - target:
+          entity_id: light.study_light
+        action: light.turn_on
+    - conditions:
+      - condition: trigger
+        id: light_off
+      sequence:
+      - target:
+          entity_id: light.study_light
+        action: light.turn_off
+    - conditions:
+      - condition: trigger
+        id: change_color_left_hold
+      sequence:
+      - repeat:
+          sequence:
+          - target:
+              entity_id: light.study_light
+            data:
+              color_temp_kelvin: '{{ state_attr(light_entity, ''color_temp_kelvin'')
+                - 100 }}'
+            action: light.turn_on
+          - delay:
+              milliseconds: 300
+          until:
+          - condition: trigger
+            id: change_color_left_release
+    - conditions:
+      - condition: trigger
+        id: change_color_right_hold
+      sequence:
+      - repeat:
+          sequence:
+          - target:
+              entity_id: light.study_light
+            data:
+              color_temp_kelvin: '{{ state_attr(light_entity, ''color_temp_kelvin'')
+                + 100 }}'
+            action: light.turn_on
+          - delay:
+              milliseconds: 300
+          until:
+          - condition: trigger
+            id: change_color_right_release
+    - conditions:
+      - condition: trigger
+        id: change_color_left
+      sequence:
+      - repeat:
+          sequence:
+          - target:
+              entity_id: light.study_light
+            data:
+              brightness_step_pct: -{{ brightness_step | int(5) }}
+              transition: 1
+            action: light.turn_on
+          - delay:
+              milliseconds: 300
+          until:
+          - condition: trigger
+            id: dim_stop
+    - conditions:
+      - condition: trigger
+        id: change_color_right
+      sequence:
+      - repeat:
+          sequence:
+          - target:
+              entity_id: light.study_light
+            data:
+              brightness_step_pct: '{{ brightness_step | int(5) }}'
+              transition: 1
+            action: light.turn_on
+          - delay:
+              milliseconds: 300
+          until:
+          - condition: trigger
+            id: dim_stop
+  variables:
+    light_entity: light.study_light
+    brightness_step: 5
+  mode: restart
+- id: '1772780699905'
+  alias: Garage Remote Button 1 PRESSED - OPEN GARAGE
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - event.garage_remote_button_1
+  conditions: []
+  actions:
+  - action: switch.toggle
+    metadata: {}
+    target:
+      entity_id:
+      - switch.garage_opener
+      - switch.driveway_gate
+    data: {}
+    enabled: false
+  - action: light.toggle
+    metadata: {}
+    target:
+      entity_id: light.garage_light
+    data: {}
+  mode: single
+- id: '1774067150892'
+  alias: WLED4 RESTART after Connection Lost
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - light.wled_penta_deca_2
+    to:
+    - unavailable
+  conditions: []
+  actions:
+  - sequence:
+    - type: turn_off
+      device_id: 166a15def39e737d54865fdccbf3f6b1
+      entity_id: b3e0ba56054eb10c38130a6f6a98ba3a
+      domain: light
+    - type: turn_on
+      device_id: 166a15def39e737d54865fdccbf3f6b1
+      entity_id: b3e0ba56054eb10c38130a6f6a98ba3a
+      domain: light
+    - type: turn_on
+      device_id: 7fbf2ac8a1873e2bbef3ffaae84a8d90
+      entity_id: 356a01b0d952d26f11af81e3fbb5e896
+      domain: light
+    - action: wled_liveviewproxy.send_command
+      metadata: {}
+      data:
+        command:
+          seg:
+          - id: 0
+            col:
+            - w: 255
+          - id: 1
+            col:
+            - w: 255
+          - id: 2
+            col:
+            - w: 255
+        targets:
+          entity_id: light.wlvp_wled_penta_plus_1
+      response_variable: WLED-LIVE
+    - type: turn_off
+      device_id: 7fbf2ac8a1873e2bbef3ffaae84a8d90
+      entity_id: 356a01b0d952d26f11af81e3fbb5e896
+      domain: light
+  mode: single
+- id: '1774069470806'
+  alias: WLED4 MAXIMIZE White Channel After Turning On
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - light.wled_penta_deca_2
+    to:
+    - 'on'
+  conditions: []
+  actions:
+  - action: wled_liveviewproxy.send_command
+    metadata: {}
+    data:
+      command:
+        seg:
+        - id: 0
+          col:
+          - w: 255
+        - id: 1
+          col:
+          - w: 255
+        - id: 2
+          col:
+          - w: 255
+    response_variable: WLED-LIVE
+  mode: single
+- id: '1776398486624'
+  alias: Frontyard LED Motion Activation
+  description: ''
+  use_blueprint:
+    path: motion_light_blueprint.yaml
+    input:
+      motion_sensors:
+      - binary_sensor.front_door_motion_occupancy
+      - binary_sensor.frontgate_sensor_door
+      - binary_sensor.frontgate_motion_occupancy
+      - binary_sensor.front_door_sensor
+      light_entity: light.wled_penta_deca_2
+      use_end_time: false
+      run_during_day: false
+      active_boolean: input_boolean.frontyard_led_toggle
+      use_sun_window: true
+      use_fixed_start: false
+      use_sunset_offset: true
+      use_sunrise_start: true
+- id: '1780215697303'
+  alias: EMHASS Amber - Anker Battery Management
+  description: automatically control the Amber - Anker battery system via EMHASS energy
+    plan
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.mpc_batt_power
+    - sensor.mpc_grid_power
+    from:
+    to:
+  actions:
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 1
+      milliseconds: 0
+  - variables:
+      p_batt: '{{ states(''sensor.mpc_batt_power'') | int(0) }}'
+      p_grid: '{{ states(''sensor.mpc_grid_power'') | int(0) }}'
+      p_batt_kw: '{{ (p_batt | abs / 1000) | round(2) }}'
+      override_duration: 10
+      control_enabled: '{{ is_state(''input_boolean.emhass_battery_control'', ''on'')
+        }}'
+      planned_mode: '{% if p_grid != 0 and p_batt < 0 %}charge {%- elif p_grid !=
+        0 and p_batt > 0 %}discharge {%- else %}load-following{% endif %}'
+      status_text: '{% if planned_mode in [''charge'', ''discharge''] %} Pending:
+        {{ planned_mode }} {{ p_batt_kw }} kW for {{ override_duration }} min {%-
+        else %} Pending: load-following {%- endif %} {{- '''' if control_enabled else
+        '' — CONTROL DISABLED'' }}'
+  - action: input_text.set_value
+    metadata: {}
+    data:
+      value: '{{ status_text }}'
+    target:
+      entity_id: input_text.emhass_battery_status
+    alias: Display pending battery mode change
+  - if:
+    - condition: template
+      value_template: '{{ control_enabled }}'
+    then:
+    - choose:
+      - conditions:
+        - condition: template
+          value_template: '{{ planned_mode == ''charge'' }}'
+        sequence:
+        - action: select.select_option
+          metadata: {}
+          data:
+            option: charge
+          target:
+            entity_id: select.amber_bridge_ashqb71f39300081_requested_mode
+        - action: number.set_value
+          metadata: {}
+          data:
+            value: '{{ override_duration }}'
+          target:
+            entity_id: number.amber_bridge_ashqb71f39300081_requested_duration
+        - action: button.press
+          metadata: {}
+          data: {}
+          target:
+            entity_id: button.amber_bridge_ashqb71f39300081_apply_override
+        alias: Grid charging - charge override
+      - conditions:
+        - condition: template
+          value_template: '{{ planned_mode == ''discharge'' }}'
+        sequence:
+        - action: select.select_option
+          metadata: {}
+          data:
+            option: discharge
+          target:
+            entity_id: select.amber_bridge_ashqb71f39300081_requested_mode
+        - action: number.set_value
+          metadata: {}
+          data:
+            value: '{{ override_duration }}'
+          target:
+            entity_id: number.amber_bridge_ashqb71f39300081_requested_duration
+        - action: button.press
+          metadata: {}
+          data: {}
+          target:
+            entity_id: button.amber_bridge_ashqb71f39300081_apply_override
+        alias: Grid export - discharge override
+      default:
+      - if:
+        - condition: template
+          value_template: '{{ states(''sensor.amber_bridge_ashqb71f39300081_active_override_value'')
+            not in [''none'', ''auto'', ''selfconsume'', ''unknown'', ''unavailable'',
+            ''''] }}'
+        then:
+        - action: button.press
+          metadata: {}
+          data: {}
+          target:
+            entity_id: button.amber_bridge_ashqb71f39300081_cancel_override
+          alias: Cancel active override - return to load-following
+  mode: single
+- id: '1781223898987'
+  alias: Garage BILRESA remote OPEN - CLOSE Garage Door & Driveway Gate
+  description: ''
+  use_blueprint:
+    path: Skaronator/ikea-bilresa-dual-button.yaml
+    input:
+      button1_event:
+      - event.garage_remote_button_1
+      button2_event:
+      - event.garage_remote_button_2
+      button1_double:
+      - type: toggle
+        device_id: c43b26534726fb619504c4002d4b3644
+        entity_id: 4dd4ff128a9886a37d6d593c4bf262b6
+        domain: switch
+      button2_single:
+      - type: toggle
+        device_id: a90b958929d6092782a983c2b8efc7bc
+        entity_id: 078864ad3d00780e5ef772f0ec6edf9f
+        domain: switch
+      button2_double:
+      - type: toggle
+        device_id: a90b958929d6092782a983c2b8efc7bc
+        entity_id: 078864ad3d00780e5ef772f0ec6edf9f
+        domain: switch
+      button1_single:
+      - type: toggle
+        device_id: c43b26534726fb619504c4002d4b3644
+        entity_id: 4dd4ff128a9886a37d6d593c4bf262b6
+        domain: switch
+- id: '1784258040710'
+  alias: Front Gate Open - Sonos Audio Notification
+  description: Plays a pre-recorded audio clip on Sonos when a door opens
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.frontgate_sensor_door
+    from: 'off'
+    to: 'on'
+  actions:
+  - action: sonos.snapshot
+    target:
+      entity_id: '{{ sonos_speaker }}'
+    data:
+      with_group: true
+  - action: media_player.volume_set
+    target:
+      entity_id:
+      - media_player.sonos_beam
+    data:
+      volume_level: 0.4
+  - action: media_player.volume_set
+    target:
+      entity_id:
+      - media_player.sonos_arc_ultra
+    data:
+      volume_level: 0.4
+  - action: media_player.play_media
+    target:
+      entity_id: '{{ sonos_speaker }}'
+    data:
+      media:
+        media_content_id: media-source://media_source/local/friendly-doorbell.mp3
+        media_content_type: audio/mpeg
+        metadata:
+          title: doorbell_door_opened_nana.mp3
+          thumbnail:
+          media_class: music
+          children_media_class:
+          navigateIds:
+          - {}
+          - media_content_type: app
+            media_content_id: media-source://media_source
+          browse_entity_id: media_player.sonos_arc_ultra
+      extra:
+        volume: 20
+      enqueue: replace
+  - delay:
+      seconds: 3
+  - action: sonos.restore
+    target:
+      entity_id: '{{ sonos_speaker }}'
+    data:
+      with_group: true
+  variables:
+    sonos_speaker:
+    - media_player.sonos_beam
+    - media_player.sonos_arc_ultra
+    notification_volume: 0.4
+    audio_clip: /local/audio/doorbell_door_opened_nana.mp3
+  mode: single
+- id: '1784362112998'
+  alias: Door Open - Generic Random Sonos Notification
+  description: Plays a random clip from the folder matching the triggered sensor
+  triggers:
+  - trigger: state
+    entity_id: binary_sensor.front_door_sensor
+    from: 'off'
+    to: 'on'
+    id: front_door
+  - trigger: state
+    entity_id: binary_sensor.frontgate_sensor_door
+    from: 'off'
+    to: 'on'
+    id: front_gate
+  - trigger: state
+    entity_id: binary_sensor.garden_door_sensor_door
+    from: 'off'
+    to: 'on'
+    id: garden_door
+  - trigger: state
+    entity_id: binary_sensor.kitchen_door_sensor_door
+    from: 'off'
+    to: 'on'
+    id: kitchen_door
+  - trigger: state
+    entity_id:
+    - binary_sensor.walkway_ms600_occupancy
+    from:
+    - 'off'
+    to:
+    - 'on'
+    id: walkway
+  actions:
+  - variables:
+      audio_folder_sensor: '{{ folder_sensors[trigger.id] }}'
+      media_folder: '{{ trigger.id }}'
+  - variables:
+      file_list: '{{ state_attr(audio_folder_sensor, ''file_list'') | default([],
+        true) }}
+
+        '
+  - if:
+    - condition: template
+      value_template: '{{ file_list | length == 0 }}'
+    then:
+    - action: system_log.write
+      data:
+        level: warning
+        logger: door_sonos_notification
+        message: 'No clips for {{ trigger.id }} - {{ audio_folder_sensor }} missing
+          or /media/{{ media_folder }} has no *.mp3
+
+          '
+    - stop: No audio files available
+  - variables:
+      random_file: '{{ file_list | random }}'
+      audio_clip: 'media-source://media_source/local/{{ media_folder }}/{{ random_file.split(''/'')[-1]
+        }}
+
+        '
+  - action: sonos.snapshot
+    target:
+      entity_id: '{{ sonos_speaker }}'
+    data:
+      with_group: true
+  - action: media_player.volume_set
+    target:
+      entity_id: '{{ sonos_speaker }}'
+    data:
+      volume_level: '{{ notification_volume }}'
+  - action: media_player.play_media
+    target:
+      entity_id: '{{ sonos_speaker }}'
+    data:
+      enqueue: replace
+      media:
+        media_content_id: '{{ audio_clip }}'
+        media_content_type: music
+        metadata: {}
+  - wait_template: '{{ is_state(sonos_speaker[0], ''playing'') }}'
+    timeout: 00:00:02
+    continue_on_timeout: true
+  - wait_template: '{{ not is_state(sonos_speaker[0], ''playing'') }}'
+    timeout: 00:00:05
+    continue_on_timeout: true
+  - action: sonos.restore
+    target:
+      entity_id: '{{ sonos_speaker }}'
+    data:
+      with_group: true
+  variables:
+    sonos_speaker:
+    - media_player.sonos_beam
+    - media_player.sonos_arc_ultra
+    notification_volume: 0.4
+    folder_sensors:
+      front_door: sensor.front_door
+      front_gate: sensor.front_gate
+      garden_door: sensor.garden_door
+      kitchen_door: sensor.kitchen_door
+      walkway: sensor.walkway
+  mode: single
+  max_exceeded: silent
