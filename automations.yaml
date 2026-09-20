@@ -587,10 +587,18 @@
     entity_id: timer.garage_light_timer
     state: active
   actions:
+  - variables:
+      extend_seconds: '{% set d = state_attr(''timer.garage_light_timer'', ''duration'').split('':'')
+        | map(''int'') | list %} {% set total = d[0] * 3600 + d[1] * 60 + d[2] %}
+        {% set remaining = (state_attr(''timer.garage_light_timer'', ''finishes_at'')
+        | as_datetime - now()).total_seconds() | round(0) | int %} {{ [60, total -
+        remaining] | min }}'
+  - condition: template
+    value_template: '{{ extend_seconds | int > 0 }}'
   - action: timer.change
     metadata: {}
     data:
-      duration: 00:01:00
+      duration: '{{ ''00:00:%02d'' % (extend_seconds | int) }}'
     target:
       entity_id: timer.garage_light_timer
   mode: single
