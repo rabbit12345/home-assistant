@@ -8,8 +8,10 @@ blueprint:
     sunset + an end offset.
     Replaces the usual cluster of separate "turn on at sunset", "brighten on
     motion", "extend timer", "timer expired" and "turn off" automations.
-    Requires one Timer helper per instance -
-    create at Settings > Devices & Services > Helpers > Timer.
+    Requires three helpers per instance, created at
+    Settings > Devices & Services > Helpers:
+    a Timer (the hold countdown), a Number (hold duration in minutes) and a
+    Toggle (enables the timer behaviour).
   domain: automation
   source_url: https://community.home-assistant.io/
 
@@ -37,50 +39,39 @@ blueprint:
     timer_entity:
       name: Hold Timer Helper
       description: >-
-        The Timer helper this instance owns. Use a unique helper per instance -
-        create at Settings > Devices & Services > Helpers > Timer.
+        Helper 1 of 3. The Timer helper this instance owns - the hold countdown.
+        Use a unique helper per instance; create at
+        Settings > Devices & Services > Helpers > Timer.
         Its own configured duration is irrelevant; this blueprint always starts it
-        with the Hold Duration below.
+        with the value of the Hold Duration helper below.
       selector:
         entity:
           filter:
             domain: timer
 
-    enable_toggle:
-      name: Enable Toggle (optional)
-      description: >-
-        Optional input_boolean that gates activity handling. When set, activity
-        sensors are ignored while it is off. Leave empty to always run.
-      default: []
-      selector:
-        entity:
-          filter:
-            domain: input_boolean
-          multiple: true
-
-    hold_minutes:
-      name: Hold Duration (minutes)
-      description: How long the light stays bright after activity.
-      default: 15
-      selector:
-        number:
-          min: 1
-          max: 240
-          step: 1
-          unit_of_measurement: min
-          mode: box
-
     hold_minutes_helper:
-      name: Hold Duration Helper (optional)
+      name: Hold Duration Helper
       description: >-
-        Optional input_number whose value overrides Hold Duration, so the hold can
-        be changed from a dashboard. Leave empty to use the fixed value above.
-      default: []
+        Helper 2 of 3. An input_number holding the hold duration in minutes, so it
+        can be changed from a dashboard without editing the automation.
+        Create at Settings > Devices & Services > Helpers > Number.
+        Falls back to 15 minutes if the helper is unavailable.
       selector:
         entity:
           filter:
             domain: input_number
-          multiple: true
+
+    enable_toggle:
+      name: Enable Toggle
+      description: >-
+        Helper 3 of 3. An input_boolean that enables the timer behaviour. While it
+        is off, activity sensors are ignored and the light is left at whatever the
+        sunset schedule set. Create at
+        Settings > Devices & Services > Helpers > Toggle.
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
 
     extend_seconds:
       name: Extension Per Activity (seconds)
@@ -172,7 +163,6 @@ variables:
   light_var: !input light_entity
   timer_var: !input timer_entity
   enable_toggle_var: !input enable_toggle
-  hold_minutes_var: !input hold_minutes
   hold_minutes_helper_var: !input hold_minutes_helper
   extend_seconds_var: !input extend_seconds
   active_brightness_var: !input active_brightness_pct
@@ -182,17 +172,14 @@ variables:
   sunset_on_offset_var: !input sunset_on_offset
   sunset_off_offset_var: !input sunset_off_offset
 
-  # Effective hold, in minutes: the optional input_number wins when set.
+  # Hold duration in minutes, from the helper. Guards against an unavailable
+  # helper and against a 0 that would make timer.start a no-op.
   hold_mins: >-
-    {% if hold_minutes_helper_var | count > 0 %}
-      {{ states(hold_minutes_helper_var[0]) | int(hold_minutes_var | int(15)) }}
-    {% else %}
-      {{ hold_minutes_var | int(15) }}
-    {% endif %}
+    {% set m = states(hold_minutes_helper_var) | int(0) %}
+    {{ m if m > 0 else 15 }}
 
-  # Enable gate: no helper configured means always enabled.
-  enabled: >-
-    {{ enable_toggle_var | count == 0 or is_state(enable_toggle_var[0], 'on') }}
+  # Enable gate.
+  enabled: "{{ is_state(enable_toggle_var, 'on') }}"
 
   # Activity window. With no sunset schedule the window is always open;
   # otherwise it runs from today's sunset + on offset to sunset + off offset.
