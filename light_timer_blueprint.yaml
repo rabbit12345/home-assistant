@@ -1,11 +1,12 @@
 blueprint:
-  name: "Light Timer: Activity Hold + Sunset Schedule"
+  name: "Light Timer: Activity Hold + Overnight Schedule"
   description: >-
     All-in-one controller for one or more lights. Turns them on when an activity
-    sensor fires inside an evening window defined by offsets from sunset, holds
+    sensor fires inside an overnight window that opens at sunset and closes at
+    sunrise the next morning, each end shiftable by an offset; holds
     them on with a timer helper that each new activity extends (capped at the
     timer duration), returns them to their prior state - or to a dim level, or
-    off - when the timer expires, and sweeps them off at the end of the window.
+    off - when the timer expires, and sweeps them off when the window closes.
     The lights are never switched on by the schedule itself, only by activity
     inside it.
     Dimmable and non-dimmable lights are handled separately, so a plain on/off
@@ -16,7 +17,7 @@ blueprint:
     Settings > Devices & Services > Helpers:
     a Timer (the hold countdown), a Number (hold duration in minutes) and a
     Toggle (enables the timer behaviour). A fourth, optional Toggle switches the
-    sunset schedule on; leave it blank to run at any hour.
+    overnight schedule on; leave it blank to run at any hour.
   domain: automation
   source_url: https://community.home-assistant.io/
 
@@ -144,13 +145,14 @@ blueprint:
           mode: slider
 
     sunset_schedule_toggle:
-      name: Sunset Schedule Toggle (optional)
+      name: Overnight Schedule Toggle (optional)
       description: >-
-        Optional extra helper: an input_boolean that switches the evening window
-        on. While it is on, activity sensors only act between sunset + Window
-        Start Offset and sunset + Window End Offset, and the lights are swept off
-        at the end of the window. While it is off there is no window at all and
-        activity sensors run at any hour.
+        Optional extra helper: an input_boolean that switches the overnight
+        window on. While it is on, activity sensors only act between
+        sunset + Window Start Offset and sunrise + Window End Offset the next
+        morning, and the lights are swept off when the window closes.
+        While it is off there is no window at all and activity sensors run at any
+        hour.
         Leave this blank if the instance never needs a window - the two Window
         Offset inputs below are then unused. Create at
         Settings > Devices & Services > Helpers > Toggle.
@@ -162,20 +164,23 @@ blueprint:
           multiple: true
 
     sunset_on_offset:
-      name: Window Start Offset
+      name: Window Start Offset (from sunset)
       description: >-
-        Time relative to sunset at which activity starts turning the lights on,
-        as H:MM:SS. Prefix with "-" for before sunset (e.g. -0:30:00).
+        Time relative to sunset at which the window opens and activity starts
+        turning the lights on, as H:MM:SS. Prefix with "-" for before sunset
+        (e.g. -0:30:00 opens half an hour early).
       default: "0:00:00"
       selector:
         text:
 
-    sunset_off_offset:
-      name: Window End Offset
+    sunrise_off_offset:
+      name: Window End Offset (from sunrise)
       description: >-
-        Time after sunset at which the window closes: activity stops acting and
-        the lights are swept off. As H:MM:SS (e.g. 2:30:00).
-      default: "2:30:00"
+        Time relative to the next sunrise at which the window closes: activity
+        stops acting and the lights are swept off. As H:MM:SS, with "-" for
+        before sunrise (e.g. -0:30:00 closes half an hour early, 1:00:00 keeps it
+        open an hour past sunrise). The window always runs through midnight.
+      default: "0:00:00"
       selector:
         text:
 
@@ -191,7 +196,7 @@ variables:
   idle_brightness_var: !input idle_brightness_pct
   sunset_schedule_var: !input sunset_schedule_toggle
   sunset_on_offset_var: !input sunset_on_offset
-  sunset_off_offset_var: !input sunset_off_offset
+  sunrise_off_offset_var: !input sunrise_off_offset
 
   # Hold duration in minutes, from the helper. Guards against an unavailable
   # helper and against a 0 that would make timer.start a no-op.
@@ -239,8 +244,14 @@ variables:
        and is_state(sunset_schedule_var[0], 'on') }}
 
   # Activity window. With no window toggle, or with it off, the window is always
-  # open; otherwise it runs from today's sunset + start offset to sunset + end
-  # offset. Today's sunset is next_setting - 24h once the sun is already down.
+  # open; otherwise it opens at today's sunset + start offset and closes at
+  # today's sunrise + end offset, so it wraps through midnight: everything from
+  # this evening onwards is inside it, and so is everything up to this morning's
+  # close. The single "at or after the open OR before the close" test covers both
+  # halves of the night without needing to know which side of midnight we are on.
+  # next_setting / next_rising are at most a day ahead, so subtracting 24h from a
+  # tomorrow value lands on today's - within a minute or two, and within an hour
+  # across a DST change.
   in_window: >-
     {% if not schedule_on %}
       {{ true }}
@@ -248,14 +259,17 @@ variables:
       {% set on_p = (sunset_on_offset_var | replace('-', '')).split(':') | map('int') | list %}
       {% set on_s = (on_p[0] * 3600 + on_p[1] * 60 + (on_p[2] if on_p | count > 2 else 0))
                     * (-1 if sunset_on_offset_var.startswith('-') else 1) %}
-      {% set off_p = (sunset_off_offset_var | replace('-', '')).split(':') | map('int') | list %}
+      {% set off_p = (sunrise_off_offset_var | replace('-', '')).split(':') | map('int') | list %}
       {% set off_s = (off_p[0] * 3600 + off_p[1] * 60 + (off_p[2] if off_p | count > 2 else 0))
-                     * (-1 if sunset_off_offset_var.startswith('-') else 1) %}
+                     * (-1 if sunrise_off_offset_var.startswith('-') else 1) %}
       {% set next_set = state_attr('sun.sun', 'next_setting') | as_datetime | as_local %}
-      {% set sunset = next_set - timedelta(hours=24)
-                      if states('sun.sun') == 'below_horizon' else next_set %}
+      {% set sunset = next_set if next_set.date() == now().date()
+                      else next_set - timedelta(hours=24) %}
+      {% set next_rise = state_attr('sun.sun', 'next_rising') | as_datetime | as_local %}
+      {% set sunrise = next_rise if next_rise.date() == now().date()
+                       else next_rise - timedelta(hours=24) %}
       {{ now() >= sunset + timedelta(seconds=on_s)
-         and now() < sunset + timedelta(seconds=off_s) }}
+         or now() < sunrise + timedelta(seconds=off_s) }}
     {% endif %}
 
 
@@ -271,9 +285,9 @@ triggers:
     id: expired
 
   - trigger: sun
-    event: sunset
-    offset: !input sunset_off_offset
-    id: sunset_off
+    event: sunrise
+    offset: !input sunrise_off_offset
+    id: window_end
 
 
 conditions: []
@@ -352,7 +366,7 @@ actions:
       # Hold expired: restore the snapshot, dim back to idle, or turn off.
       # Restoring or dimming outside the schedule window would switch the lights
       # back on, so anything outside the window turns off regardless of the idle
-      # action. That also covers the timer.cancel in the sunset-off branch, which
+      # action. That also covers the timer.cancel in the window-close branch, which
       # drives the timer to idle and so fires this trigger.
       - alias: "Hold timer expired"
         conditions:
@@ -391,11 +405,12 @@ actions:
                 target:
                   entity_id: !input light_entity
 
-      # Window close: cancel any hold so its expiry cannot re-light the lights.
+      # Window close, at sunrise + end offset: cancel any hold so its expiry
+      # cannot re-light the lights.
       - alias: "Window close"
         conditions:
           - condition: trigger
-            id: sunset_off
+            id: window_end
           - condition: template
             value_template: "{{ schedule_on }}"
         sequence:
