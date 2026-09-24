@@ -1,139 +1,132 @@
 #!/usr/bin/env python3
 """
-Fetch a fuel price from fuelradar.com.au for a given fuel type.
-Usage: python3 fuel_price.py <CODE>
-  CODE: P98, E10, Diesel (or any partial match on the fuel name/code)
+Fetch a fuel price for Costco Auburn from the NSW Government FuelCheck API.
+Usage:
+  python3 fuel_price.py <CODE>              CODE: P98, E10, Diesel
+  python3 fuel_price.py --find-station <q>  one-off: list stations matching q
 
-Returns the price in c/L as a float, or exits with code 1 on failure.
+Uses the official FuelCheck API (OAuth2 client-credentials) instead of
+scraping a third-party site, so it is not affected by front-end markup
+changes or anti-bot protection.
 
-Extraction strategy (most durable first):
-  1. schema.org JSON-LD (GasStation / makesOffer) - a web standard the site
-     emits for SEO, so it survives front-end framework changes.
-  2/3. Framework-internal blobs (Next.js / Inertia) as fallbacks only.
-Prices are normalised to c/L regardless of how the site encodes them
-(dollars 1.667, cents 166.7, or integer tenths 1667).
+Credentials are read from secrets.yaml (fuelcheck_api_key / fuelcheck_api_secret),
+next to this script - never passed on the command line or hardcoded.
 """
 
 import sys
+import os
 import json
-import re
+import base64
+import uuid
+from datetime import datetime
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 
-URL = "https://fuelradar.com.au/map/station/437aa5eea143da5dd19defc3"
-# NOTE: do NOT send an explicit "Accept-Encoding" here. Advertising "br"
-# while curl lacks brotli support makes curl fail with rc 61. Passing
-# --compressed lets curl advertise only the encodings it can decode.
-HEADERS = [
-    "-H", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "-H", "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "-H", "Accept-Language: en-AU,en;q=0.9",
-]
+import yaml
 
+# Costco Auburn's FuelCheck station code. Found once via --find-station and
+# hardcoded since it does not change; only prices are fetched per poll.
+STATION_CODE = "20550"  # Costco Auburn (Lidcombe), found via --find-station costco
 
-def fetch_html():
-    import subprocess
-    result = subprocess.run(
-        ["curl", "-s", "-L", "--compressed"] + HEADERS + [URL],
-        capture_output=True, text=True, timeout=30
-    )
-    return result.stdout
+TOKEN_URL = "https://api.onegov.nsw.gov.au/oauth/client_credential/accesstoken?grant_type=client_credentials"
+PRICES_URL = "https://api.onegov.nsw.gov.au/FuelPriceCheck/v2/fuel/prices"
+STATION_PRICES_URL = "https://api.onegov.nsw.gov.au/FuelPriceCheck/v2/fuel/prices/station/{code}"
 
+SECRETS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "secrets.yaml")
 
-def fuel_matches(name, code, target):
-    """True if the fuel name/code matches the requested target."""
-    t = target.upper()
-    return t in name.upper() or t in code.upper()
+# api.onegov.nsw.gov.au sits behind Cloudflare, which blocks the default
+# Python urllib User-Agent (Cloudflare error 1010) regardless of valid auth.
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 
-def to_cents_per_litre(raw):
-    """Normalise a raw price to c/L, whatever unit the site used.
-
-    dollars (1.667) -> *100 ; c/L (166.7) -> as-is ; tenths (1667) -> /10
-    """
-    v = float(raw)
-    if v < 10:          # dollars per litre
-        return v * 100
-    if v > 500:         # integer tenths of a cent
-        return v / 10
-    return v            # already c/L
+def load_secrets():
+    with open(SECRETS_PATH) as f:
+        secrets = yaml.safe_load(f)
+    return secrets["fuelcheck_api_key"], secrets["fuelcheck_api_secret"]
 
 
-def method_jsonld(html, target):
-    """schema.org JSON-LD. Scan every ld+json block for a GasStation."""
-    for m in re.finditer(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL):
-        try:
-            data = json.loads(m.group(1))
-        except ValueError:
-            continue
-        # @type may be a single string or a list of types (schema.org allows
-        # multi-typing, e.g. ["GasStation", "AutomotiveBusiness"]).
-        types = data.get("@type", [])
-        if isinstance(types, str):
-            types = [types]
-        if "GasStation" not in types:
-            continue
-        # makesOffer may itself be a single offer object or a list.
-        offers = data.get("makesOffer", [])
-        if isinstance(offers, dict):
-            offers = [offers]
-        for offer in offers:
-            name = offer.get("itemOffered", {}).get("name", "")
-            if fuel_matches(name, name, target):
-                price = offer.get("price")
-                if price is not None:
-                    return to_cents_per_litre(price)
-    return None
+def get_token(api_key, api_secret):
+    basic = base64.b64encode(f"{api_key}:{api_secret}".encode()).decode()
+    req = Request(TOKEN_URL, headers={"Authorization": f"Basic {basic}", "User-Agent": USER_AGENT, "Accept": "application/json"})
+    with urlopen(req, timeout=15) as resp:
+        return json.load(resp)["access_token"]
 
 
-def method_next_data(html, target):
-    """Next.js: <script id="__NEXT_DATA__" type="application/json">"""
-    m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html, re.DOTALL)
-    if not m:
-        return None
-    data = json.loads(m.group(1))
-    prices = (data.get("props", {})
-                  .get("pageProps", {})
-                  .get("page", {})
-                  .get("props", {})
-                  .get("stationData", {})
-                  .get("Prices", []))
-    for p in prices:
-        if fuel_matches(p.get("Name", ""), p.get("Code", ""), target):
-            return to_cents_per_litre(p.get("Price", 0))
-    return None
+def api_headers(api_key, token):
+    return {
+        "Authorization": f"Bearer {token}",
+        "apikey": api_key,
+        "Content-Type": "application/json; charset=utf-8",
+        "transactionid": str(uuid.uuid4()),
+        "requesttimestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json",
+    }
 
 
-def method_inertia(html, target):
-    """Inertia.js: data-page attribute on #app"""
-    m = re.search(r'data-page="(.*?)"', html)
-    if not m:
-        return None
-    data = json.loads(m.group(1).replace("&quot;", '"'))
-    prices = data.get("props", {}).get("stationData", {}).get("Prices", [])
-    for p in prices:
-        if fuel_matches(p.get("Name", ""), p.get("Code", ""), target):
-            return to_cents_per_litre(p.get("Price", 0))
-    return None
+def get_station_prices(api_key, token, station_code):
+    url = STATION_PRICES_URL.format(code=station_code)
+    req = Request(url, headers=api_headers(api_key, token))
+    with urlopen(req, timeout=15) as resp:
+        return json.load(resp)
+
+
+def get_all_prices(api_key, token):
+    req = Request(PRICES_URL, headers=api_headers(api_key, token))
+    with urlopen(req, timeout=30) as resp:
+        return json.load(resp)
+
+
+# FuelCheck's diesel code is "PDL", not "Diesel".
+FUEL_ALIASES = {"DIESEL": "PDL"}
+
+
+def fuel_matches(code, target):
+    target = FUEL_ALIASES.get(target.upper(), target.upper())
+    return target == code.upper()
+
+
+def find_station(query):
+    api_key, api_secret = load_secrets()
+    token = get_token(api_key, api_secret)
+    data = get_all_prices(api_key, token)
+    q = query.upper()
+    for s in data.get("stations", []):
+        name = s.get("name", "")
+        address = s.get("address", "")
+        if q in name.upper() or q in address.upper():
+            print(s.get("code"), "-", name, "-", address)
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: fuel_price.py <fuel_code>", file=sys.stderr)
+        print("Usage: fuel_price.py <fuel_code> | --find-station <query>", file=sys.stderr)
         sys.exit(1)
+
+    if sys.argv[1] == "--find-station":
+        if len(sys.argv) < 3:
+            print("Usage: fuel_price.py --find-station <query>", file=sys.stderr)
+            sys.exit(1)
+        find_station(sys.argv[2])
+        sys.exit(0)
 
     target = sys.argv[1]
-    html = fetch_html()
-    if not html:
-        print("fetch failed: empty response", file=sys.stderr)
+    if not STATION_CODE:
+        print("STATION_CODE not set - run: fuel_price.py --find-station costco", file=sys.stderr)
         sys.exit(1)
 
-    for method in (method_jsonld, method_next_data, method_inertia):
-        try:
-            price = method(html, target)
-            if price is not None:
-                print(round(float(price), 1))
-                sys.exit(0)
-        except Exception:
-            continue
+    try:
+        api_key, api_secret = load_secrets()
+        token = get_token(api_key, api_secret)
+        data = get_station_prices(api_key, token, STATION_CODE)
+    except (HTTPError, OSError, KeyError) as e:
+        print(f"FuelCheck API error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    for p in data.get("prices", []):
+        if fuel_matches(p.get("fueltype", ""), target):
+            print(round(float(p["price"]), 1))
+            sys.exit(0)
 
     print("no price found for %r" % target, file=sys.stderr)
     sys.exit(1)
