@@ -249,9 +249,14 @@ variables:
   # this evening onwards is inside it, and so is everything up to this morning's
   # close. The single "at or after the open OR before the close" test covers both
   # halves of the night without needing to know which side of midnight we are on.
-  # next_setting / next_rising are at most a day ahead, so subtracting 24h from a
-  # tomorrow value lands on today's - within a minute or two, and within an hour
-  # across a DST change.
+  # next_setting / next_rising are at most a day ahead, so stepping back 24h from
+  # a tomorrow value lands on today's, to within the minute or so that sunset
+  # moves per day. That step is taken on the epoch timestamp so it is 24 absolute
+  # hours: subtracting timedelta(hours=24) from a zone-aware datetime shifts the
+  # wall clock instead, which is an hour wrong on the two DST changeover days
+  # (sunset itself only drifts a minute or two, so absolute time is the right
+  # thing to hold fixed). The date comparison stays in local time, where "today"
+  # is defined.
   in_window: >-
     {% if not schedule_on %}
       {{ true }}
@@ -262,12 +267,14 @@ variables:
       {% set off_p = (sunrise_off_offset_var | replace('-', '')).split(':') | map('int') | list %}
       {% set off_s = (off_p[0] * 3600 + off_p[1] * 60 + (off_p[2] if off_p | count > 2 else 0))
                      * (-1 if sunrise_off_offset_var.startswith('-') else 1) %}
-      {% set next_set = state_attr('sun.sun', 'next_setting') | as_datetime | as_local %}
-      {% set sunset = next_set if next_set.date() == now().date()
-                      else next_set - timedelta(hours=24) %}
-      {% set next_rise = state_attr('sun.sun', 'next_rising') | as_datetime | as_local %}
-      {% set sunrise = next_rise if next_rise.date() == now().date()
-                       else next_rise - timedelta(hours=24) %}
+      {% set next_set = state_attr('sun.sun', 'next_setting') | as_datetime %}
+      {% set sunset = next_set | as_local
+                      if (next_set | as_local).date() == now().date()
+                      else ((next_set | as_timestamp) - 86400) | as_datetime | as_local %}
+      {% set next_rise = state_attr('sun.sun', 'next_rising') | as_datetime %}
+      {% set sunrise = next_rise | as_local
+                       if (next_rise | as_local).date() == now().date()
+                       else ((next_rise | as_timestamp) - 86400) | as_datetime | as_local %}
       {{ now() >= sunset + timedelta(seconds=on_s)
          or now() < sunrise + timedelta(seconds=off_s) }}
     {% endif %}
@@ -279,9 +286,16 @@ triggers:
     to: "on"
     id: activity
 
-  - trigger: state
-    entity_id: !input timer_entity
-    to: idle
+  # The timer.finished event, not the state change to idle: timer.cancel also
+  # lands on idle, and the window-close branch below cancels the hold. Triggering
+  # on the state change meant that cancel queued an expiry run which then ran
+  # after the close had turned the lights off - and with the restore action put
+  # them straight back on. timer.cancel fires timer.cancelled, so this trigger
+  # now sees natural expiry only.
+  - trigger: event
+    event_type: timer.finished
+    event_data:
+      entity_id: !input timer_entity
     id: expired
 
   - trigger: sun
@@ -366,8 +380,7 @@ actions:
       # Hold expired: restore the snapshot, dim back to idle, or turn off.
       # Restoring or dimming outside the schedule window would switch the lights
       # back on, so anything outside the window turns off regardless of the idle
-      # action. That also covers the timer.cancel in the window-close branch, which
-      # drives the timer to idle and so fires this trigger.
+      # action - which covers the schedule toggle going off mid-hold.
       - alias: "Hold timer expired"
         conditions:
           - condition: trigger
@@ -405,8 +418,8 @@ actions:
                 target:
                   entity_id: !input light_entity
 
-      # Window close, at sunrise + end offset: cancel any hold so its expiry
-      # cannot re-light the lights.
+      # Window close, at sunrise + end offset: cancel any hold so it cannot go on
+      # to expire after the lights have been swept off.
       - alias: "Window close"
         conditions:
           - condition: trigger
