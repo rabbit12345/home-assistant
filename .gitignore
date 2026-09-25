@@ -1,0 +1,26 @@
+# Secrets and credentials
+secrets.yaml
+*.key
+*.pem
+*token*
+*credential*
+
+# Local alarm / network probe scripts (contain LAN addresses)
+sateltest.ps1
+
+# HA runtime state
+.storage/
+*.db
+*.db-*
+*.log
+*.log.*
+home-assistant_v2.db*
+.cloud/
+.uuid
+tts/
+deps/
+__pycache__/
+
+# OS noise
+Thumbs.db
+.DS_Store

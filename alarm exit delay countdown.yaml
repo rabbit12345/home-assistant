@@ -1,0 +1,98 @@
+alias: Alarm - Exit Delay Countdown
+description: >
+  Plays an 8 second countdown over Sonos while the Satel panel is counting its
+  exit delay, so you know how long you have to leave.
+
+# Clip: /media/alarm/exit_delay.mp3
+#   1 beep/sec for 5s, then faster for 3s. Deliberately 8s against a 10s exit
+#   delay - Sonos takes ~1-1.5s to start, so it lands ~1.5s to ~9.5s and
+#   finishes before the arm confirmation plays.
+#
+# Entry delay is deliberately NOT covered. A countdown on entry announces to an
+# intruder exactly how long they have before the sirens.
+
+triggers:
+  # No `for:` here - a countdown that starts late is worthless, and there is no
+  # transient-state problem on `arming` the way there is on the armed_* states.
+  - trigger: state
+    entity_id: alarm_control_panel.house
+    to: arming
+    not_from:
+      - unknown
+      - unavailable
+
+variables:
+  sonos_speaker:
+    - media_player.sonos_beam
+    #- media_player.sonos_arc_ultra
+
+  countdown_volume: 0.35
+
+  audio_clip: media-source://media_source/local/alarm/exit_delay.mp3
+
+actions:
+  # Same latency trick as the confirmation automation: only pay for
+  # snapshot/restore when there is actually playback to preserve.
+  - variables:
+      was_playing: "{{ is_state(sonos_speaker[0], 'playing') }}"
+      prior_volume: >
+        {{ state_attr(sonos_speaker[0], 'volume_level') | float(0.3) }}
+
+  - if:
+      - condition: template
+        value_template: "{{ was_playing }}"
+    then:
+      - action: sonos.snapshot
+        target:
+          entity_id: "{{ sonos_speaker }}"
+        data:
+          with_group: true
+
+  - action: media_player.volume_set
+    target:
+      entity_id: "{{ sonos_speaker }}"
+    data:
+      volume_level: "{{ countdown_volume }}"
+
+  - action: media_player.play_media
+    target:
+      entity_id: "{{ sonos_speaker }}"
+    data:
+      media_content_id: "{{ audio_clip }}"
+      media_content_type: music
+      enqueue: replace
+
+  # Wait for the exit delay to end - either it armed, or it was disarmed early.
+  - wait_template: >
+      {{ not is_state('alarm_control_panel.house', 'arming') }}
+    timeout: "00:00:20"
+    continue_on_timeout: true
+
+  # Disarmed mid-countdown: cut the beeping off rather than letting it run on.
+  - if:
+      - condition: state
+        entity_id: alarm_control_panel.house
+        state: disarmed
+    then:
+      - action: media_player.media_stop
+        target:
+          entity_id: "{{ sonos_speaker }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ was_playing }}"
+    then:
+      - action: sonos.restore
+        target:
+          entity_id: "{{ sonos_speaker }}"
+        data:
+          with_group: true
+    else:
+      - action: media_player.volume_set
+        target:
+          entity_id: "{{ sonos_speaker }}"
+        data:
+          volume_level: "{{ prior_volume }}"
+
+# restart: a re-arm during an existing countdown should start over, not queue.
+mode: restart

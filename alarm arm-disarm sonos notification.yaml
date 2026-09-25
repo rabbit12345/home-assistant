@@ -1,0 +1,191 @@
+alias: Alarm - Arm/Disarm Sonos Notification
+description: >
+  Plays a short confirmation clip when the Satel panel arms or disarms, and a
+  distinct 7-pulse clip when an arm attempt fails to take.
+
+# Clips live in /media/alarm/*.mp3  (same media_dirs root as the door clips)
+#   arm.mp3         - full / day arm
+#   night_arm.mp3   - night arm  (Satel arming mode 2, surfaces as armed_home)
+#   disarm.mp3      - disarm
+#   failed_arm.mp3  - arm commanded but partition never armed (7 pulses,
+#                     matching the panel's own func 23 "denial of arming")
+#
+# NOTE: satel_integra does not necessarily report armed_away for Satel arming
+# mode 0 and armed_home for mode 2 - it may use armed_night, or the same state
+# for both. So the armed trigger matches EVERY armed_* state and the clip is
+# chosen from the resulting state via night_states below. Check what your panel
+# actually reports in Developer Tools and prune night_states to match.
+
+triggers:
+  # Match ANY armed state. Which one satel_integra reports for Satel arming
+  # mode 0 vs mode 2 is not guaranteed, so do not match on a single state -
+  # that is what silently swallowed the arm clip before.
+  - trigger: state
+    entity_id: alarm_control_panel.house
+    to:
+      - armed_away
+      - armed_home
+      - armed_night
+      - armed_vacation
+      - armed_custom_bypass
+    not_from:
+      - unknown
+      - unavailable
+    # settle time: the panel can pass THROUGH one armed state on its way to
+    # another (e.g. armed_away -> armed_home on a night arm). Without this,
+    # each intermediate state fires its own clip and you hear two in a row.
+    for: "00:00:01"
+    id: armed_any
+
+  - trigger: state
+    entity_id: alarm_control_panel.house
+    to: disarmed
+    not_from:
+      - unknown
+      - unavailable
+    for: "00:00:01"
+    id: disarmed
+
+  # An arm was COMMANDED. Whether it actually took is decided below.
+  - trigger: state
+    entity_id:
+      - switch.day_arm_disarm
+      - switch.night_arm_disarm
+    to: "on"
+    not_from:
+      - unknown
+      - unavailable
+    id: arm_attempt
+
+variables:
+  sonos_speaker:
+    - media_player.sonos_beam
+    #- media_player.sonos_arc_ultra
+
+  notification_volume: 0.35
+
+  # louder than the confirmations - this is the one you must not miss
+  failed_volume: 0.5
+
+  # states that count as "the house is armed"
+  armed_states:
+    - armed_away
+    - armed_home
+    - armed_night
+    - armed_vacation
+    - armed_custom_bypass
+
+  # armed states that mean NIGHT arm (Satel arming mode 2).
+  # CONFIRMED on this panel: pressing night arm reports armed_home.
+  # Day arm is assumed to report armed_away - verify, and if day arm ALSO
+  # reports armed_home then there is no distinction to make and both should
+  # point at arm.mp3.
+  night_states:
+    - armed_home
+
+  # exit delay is 10s on partition 1; this allows for that plus poll latency.
+  # Raise it if you lengthen the partition exit delay in DLOADX.
+  arm_grace: "00:00:30"
+
+actions:
+  # --- failed-arm detection -------------------------------------------------
+  # Only runs for the arm_attempt trigger. Waits out the exit delay; if the
+  # partition armed, this branch stops silently and the armed/night_armed
+  # trigger plays the success clip instead.
+  - if:
+      - condition: template
+        value_template: "{{ trigger.id == 'arm_attempt' }}"
+    then:
+      - wait_template: >
+          {{ states('alarm_control_panel.house') in armed_states }}
+        timeout: "{{ arm_grace }}"
+        continue_on_timeout: true
+      # MUST be an explicit stop, not a bare `condition:`. A failing condition
+      # inside this then-block does not halt the run - execution falls through
+      # to the play steps below and fires failed_arm.mp3 on a SUCCESSFUL arm,
+      # while its sonos.restore also stomps on the real arm clip playing in
+      # parallel.
+      - if:
+          - condition: template
+            value_template: >
+              {{ states('alarm_control_panel.house') in armed_states }}
+        then:
+          - stop: "Arm succeeded - the armed_any trigger plays the confirmation"
+
+  - variables:
+      clip_file: >
+        {% if trigger.id == 'arm_attempt' %}
+        failed_arm.mp3
+        {% elif trigger.id == 'disarmed' %}
+        disarm.mp3
+        {% elif states('alarm_control_panel.house') in night_states %}
+        night_arm.mp3
+        {% else %}
+        arm.mp3
+        {% endif %}
+      audio_clip: >
+        media-source://media_source/local/alarm/{{ clip_file | trim }}
+      play_volume: >
+        {{ failed_volume if trigger.id == 'arm_attempt' else notification_volume }}
+
+  # Latency: sonos.snapshot is the most expensive call here and is pure overhead
+  # when the speaker is idle, which is the normal case for an alarm beep. Only
+  # pay for it when there is actually playback to preserve; otherwise just note
+  # the volume and put it back afterwards.
+  - variables:
+      was_playing: "{{ is_state(sonos_speaker[0], 'playing') }}"
+      prior_volume: >
+        {{ state_attr(sonos_speaker[0], 'volume_level') | float(0.3) }}
+
+  - if:
+      - condition: template
+        value_template: "{{ was_playing }}"
+    then:
+      - action: sonos.snapshot
+        target:
+          entity_id: "{{ sonos_speaker }}"
+        data:
+          with_group: true
+
+  - action: media_player.volume_set
+    target:
+      entity_id: "{{ sonos_speaker }}"
+    data:
+      volume_level: "{{ play_volume }}"
+
+  - action: media_player.play_media
+    target:
+      entity_id: "{{ sonos_speaker }}"
+    data:
+      media_content_id: "{{ audio_clip }}"
+      media_content_type: music
+      enqueue: replace
+
+  - wait_template: "{{ is_state(sonos_speaker[0], 'playing') }}"
+    timeout: "00:00:05"
+    continue_on_timeout: true
+  - wait_template: "{{ not is_state(sonos_speaker[0], 'playing') }}"
+    timeout: "00:00:15"
+    continue_on_timeout: true
+
+  - if:
+      - condition: template
+        value_template: "{{ was_playing }}"
+    then:
+      - action: sonos.restore
+        target:
+          entity_id: "{{ sonos_speaker }}"
+        data:
+          with_group: true
+    else:
+      # nothing was playing - just hand the volume back
+      - action: media_player.volume_set
+        target:
+          entity_id: "{{ sonos_speaker }}"
+        data:
+          volume_level: "{{ prior_volume }}"
+
+# parallel, NOT queued: the arm_attempt branch sits waiting for up to arm_grace,
+# and must not block the armed/disarmed clips from playing on time.
+mode: parallel
+max: 10

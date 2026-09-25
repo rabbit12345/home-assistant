@@ -1,0 +1,162 @@
+type: custom:layout-card
+layout_type: masonry
+layout: {}
+cards:
+  - type: custom:mushroom-template-card
+    entity: alarm_control_panel.house
+    primary: |
+      ARM status - {{ states(entity).replace('_',' ').upper() }}
+    secondary: >
+      updated {{ (as_timestamp(now()) -
+      as_timestamp(states.alarm_control_panel.house.last_changed |
+      default(0)) | int ) | timestamp_custom("%Hh %Mm", false)}} ago
+    icon: >
+      {{"mdi:alarm-light" if states(entity)=="disarmed" else
+      "mdi:alarm-light-outline"}}
+    icon_color: |
+      {% set alarm_state=states(entity) %}
+      {% if alarm_state=='disarmed' %}
+      green
+      {% elif alarm_state in ['arming','pending'] %}
+      orange
+      {% else %}
+      red
+      {% endif %}
+    tap_action:
+      action: more-info
+    hold_action:
+      action: more-info
+    multiline_secondary: false
+  - type: grid
+    square: false
+    columns: 2
+    cards:
+      - type: custom:mushroom-template-card
+        primary: Day ARM/DISARM
+        secondary: |
+          {{relative_time(states.switch.day_arm_disarm.last_changed)}}
+        entity: switch.day_arm_disarm
+        icon: mdi:security
+        icon_color: |
+          {% set alarm_state=states('alarm_control_panel.house') %}
+          {% if alarm_state=='disarmed' %}
+          green
+          {% else %}
+          red
+          {% endif %}
+        tap_action:
+          action: toggle
+        hold_action:
+          action: more-info
+        multiline_secondary: false
+      - type: custom:mushroom-template-card
+        primary: Night ARM/DISARM
+        secondary: |
+          {{relative_time(states.switch.night_arm_disarm.last_changed)}}
+        entity: switch.night_arm_disarm
+        icon: mdi:weather-night
+        icon_color: |
+          {% set alarm_state=states('alarm_control_panel.house') %}
+          {% if alarm_state=='disarmed' %}
+          green
+          {% else %}
+          red
+          {% endif %}
+        tap_action:
+          action: toggle
+        hold_action:
+          action: more-info
+        multiline_secondary: false
+      - type: custom:mushroom-template-card
+        primary: Clear Alarm
+        secondary: |
+          {{relative_time(states.switch.clear_alarm.last_changed)}}
+        entity: switch.clear_alarm
+        icon: mdi:bell-off
+        icon_color: |
+          {% set alarm_state=states('alarm_control_panel.house') %}
+          {% if alarm_state=='triggered' %}
+          red
+          {% else %}
+          green
+          {% endif %}
+        tap_action:
+          action: toggle
+        hold_action:
+          action: more-info
+        multiline_secondary: false
+      - type: custom:mushroom-template-card
+        primary: Sirens
+        secondary: >
+          {% if is_state('binary_sensor.external_siren','on') or
+          is_state('binary_sensor.internal_siren','on') %}
+          SOUNDING
+          {% else %}
+          idle
+          {% endif %}
+        entity: binary_sensor.external_siren
+        icon: mdi:bullhorn
+        icon_color: |
+          {% if is_state('binary_sensor.external_siren','on') or
+          is_state('binary_sensor.internal_siren','on') %}
+          red
+          {% else %}
+          grey
+          {% endif %}
+        tap_action:
+          action: more-info
+        hold_action:
+          action: more-info
+        multiline_secondary: false
+      - type: custom:mushroom-template-card
+        primary: PANIC
+        secondary: >
+          {% if is_state('binary_sensor.panic','on') %}
+          TRIGGERED - keyfob
+          {% elif is_state('binary_sensor.sw_panic','on') %}
+          TRIGGERED - HA
+          {% else %}
+          hold to trigger
+          {% endif %}
+        entity: binary_sensor.panic
+        icon: mdi:bell-alert
+        icon_color: >
+          {% if is_state('binary_sensor.panic','on') or
+          is_state('binary_sensor.sw_panic','on') %}
+          red
+          {% else %}
+          grey
+          {% endif %}
+        tap_action:
+          action: none
+        hold_action:
+          action: perform-action
+          perform_action: switch.turn_on
+          target:
+            entity_id: switch.panic_alarm
+          confirmation:
+            text: Trigger the PANIC alarm? This will sound the sirens.
+        multiline_secondary: false
+      - type: custom:mushroom-template-card
+        primary: Ready to Arm
+        secondary: >
+          {% if is_state('binary_sensor.ready_to_arm','on') %}
+          ready
+          {% else %}
+          zone violated
+          {% endif %}
+        entity: binary_sensor.ready_to_arm
+        icon: >
+          {{ "mdi:shield-check" if is_state('binary_sensor.ready_to_arm','on')
+          else "mdi:shield-alert" }}
+        icon_color: |
+          {% if is_state('binary_sensor.ready_to_arm','on') %}
+          green
+          {% else %}
+          amber
+          {% endif %}
+        tap_action:
+          action: more-info
+        hold_action:
+          action: more-info
+        multiline_secondary: false
