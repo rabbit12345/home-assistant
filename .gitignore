@@ -24,3 +24,10 @@ __pycache__/
 # OS noise
 Thumbs.db
 .DS_Store
+
+# Blueprints: only the ones authored here are tracked, not downloaded ones
+blueprints/*
+!blueprints/automation/
+blueprints/automation/*
+!blueprints/automation/light_timer_blueprint.yaml
+!blueprints/automation/motion_light_blueprint.yaml
