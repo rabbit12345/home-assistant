@@ -9,10 +9,8 @@ cards:
     name: Sunrise
     icon: mdi:weather-sunset-up
     color: amber
-    vertical: true
   - type: tile
     entity: sensor.sunset_time
     name: Sunset
     icon: mdi:weather-sunset-down
     color: deep-orange
-    vertical: true
