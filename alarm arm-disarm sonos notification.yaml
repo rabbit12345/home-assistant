@@ -142,18 +142,26 @@ actions:
         value_template: "{{ was_playing }}"
     then:
       - action: sonos.snapshot
+        continue_on_error: true
         target:
           entity_id: "{{ sonos_speaker }}"
         data:
           with_group: true
 
+  # continue_on_error on every Sonos call: an unreachable speaker times out
+  # after 9.5s and aborts the run, which would leave the speaker parked at
+  # play_volume with no restore. Note the consequence here is worse than the
+  # countdown automation's - failed_arm.mp3 is the clip you must not miss, so
+  # a flaky speaker must not also cost you the volume you listen at.
   - action: media_player.volume_set
+    continue_on_error: true
     target:
       entity_id: "{{ sonos_speaker }}"
     data:
       volume_level: "{{ play_volume }}"
 
   - action: media_player.play_media
+    continue_on_error: true
     target:
       entity_id: "{{ sonos_speaker }}"
     data:
@@ -173,6 +181,7 @@ actions:
         value_template: "{{ was_playing }}"
     then:
       - action: sonos.restore
+        continue_on_error: true
         target:
           entity_id: "{{ sonos_speaker }}"
         data:
@@ -180,6 +189,7 @@ actions:
     else:
       # nothing was playing - just hand the volume back
       - action: media_player.volume_set
+        continue_on_error: true
         target:
           entity_id: "{{ sonos_speaker }}"
         data:

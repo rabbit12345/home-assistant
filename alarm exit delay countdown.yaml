@@ -43,18 +43,26 @@ actions:
         value_template: "{{ was_playing }}"
     then:
       - action: sonos.snapshot
+        continue_on_error: true
         target:
           entity_id: "{{ sonos_speaker }}"
         data:
           with_group: true
 
+  # continue_on_error on every Sonos call: an unreachable speaker times out
+  # after 9.5s and aborts the run. Without this, a drop-out between the volume
+  # set below and the restore at the end leaves the Beam parked at
+  # countdown_volume permanently. Beeps are cosmetic - a dead speaker should
+  # cost you the countdown, not your volume setting.
   - action: media_player.volume_set
+    continue_on_error: true
     target:
       entity_id: "{{ sonos_speaker }}"
     data:
       volume_level: "{{ countdown_volume }}"
 
   - action: media_player.play_media
+    continue_on_error: true
     target:
       entity_id: "{{ sonos_speaker }}"
     data:
@@ -75,6 +83,7 @@ actions:
         state: disarmed
     then:
       - action: media_player.media_stop
+        continue_on_error: true
         target:
           entity_id: "{{ sonos_speaker }}"
 
@@ -83,12 +92,14 @@ actions:
         value_template: "{{ was_playing }}"
     then:
       - action: sonos.restore
+        continue_on_error: true
         target:
           entity_id: "{{ sonos_speaker }}"
         data:
           with_group: true
     else:
       - action: media_player.volume_set
+        continue_on_error: true
         target:
           entity_id: "{{ sonos_speaker }}"
         data:
