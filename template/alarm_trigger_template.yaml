@@ -1,0 +1,111 @@
+# Which zone set the alarm off, and a rolling history of the last 25.
+#
+# The Satel panel itself does not expose "the zone that caused the alarm" over
+# the integration protocol in any form satel_integra surfaces, so this records
+# it on the HA side: whenever a watched zone goes on while the partition is
+# armed (or already in entry delay / triggered), that becomes the latest entry.
+#
+# Trigger-based template entities restore their state AND attributes across a
+# restart, so the history survives reboots. It does not survive editing this
+# file's unique_id.
+#
+# TO ADD A SENSOR: append its entity_id to BOTH the trigger entity_id list and
+# the `watched` variable below. Nothing else needs to change - the card, the
+# history and the fallback all read from those two lists.
+
+- triggers:
+    - trigger: state
+      entity_id:
+        # Satel zones (satel_integra). Entity ids CONFIRMED from
+        # integration_entities('satel_integra') - note the _motion suffix;
+        # binary_sensor.kitchen is a DIFFERENT, non-Satel entity.
+        - binary_sensor.lounge_motion
+        - binary_sensor.study_motion
+        - binary_sensor.upstairs_motion
+        - binary_sensor.kitchen_motion
+        - binary_sensor.panic
+        - binary_sensor.sw_panic
+      from: "off"
+      to: "on"
+      id: zone
+
+    # Fallback: the partition went into alarm but none of the watched zones
+    # moved - something we are not watching did it. Records "unidentified" so
+    # the card never silently shows a stale entry for a fresh alarm.
+    - trigger: state
+      entity_id: alarm_control_panel.house
+      to: triggered
+      not_from:
+        - unknown
+        - unavailable
+      for: "00:00:05"
+      id: unidentified
+
+  conditions:
+    - condition: template
+      value_template: >
+        {% if trigger.id == 'zone' %}
+          {{ states('alarm_control_panel.house') in
+             ['armed_away','armed_home','armed_night','armed_vacation',
+              'armed_custom_bypass','pending','triggered'] }}
+        {% else %}
+          {# only if nothing was recorded in the last 30s #}
+          {{ (as_timestamp(now()) -
+              as_timestamp(state_attr('sensor.alarm_last_trigger','at'), 0)) > 30 }}
+        {% endif %}
+
+  sensor:
+    - name: Alarm Last Trigger
+      unique_id: alarm_last_trigger
+      icon: mdi:shield-alert
+      state: >
+        {% if trigger.id == 'zone' %}
+        {{ trigger.to_state.name }}
+        {% else %}
+        Unidentified zone
+        {% endif %}
+      attributes:
+        entity_id: >
+          {{ trigger.entity_id if trigger.id == 'zone' else 'unknown' }}
+        at: "{{ now().isoformat() }}"
+        alarm_state: "{{ states('alarm_control_panel.house') }}"
+        history: >
+          {% set prev = state_attr('sensor.alarm_last_trigger','history') or [] %}
+          {% set entry = {
+               'name': trigger.to_state.name if trigger.id == 'zone'
+                       else 'Unidentified zone',
+               'entity_id': trigger.entity_id if trigger.id == 'zone' else 'unknown',
+               'at': now().isoformat(),
+               'alarm_state': states('alarm_control_panel.house') } %}
+          {{ (prev + [entry])[-25:] }}
+
+# Plain (non-trigger) helper: which Satel zones are violated RIGHT NOW.
+# Zones are DISCOVERED via integration_entities(), matching the dashboard
+# tiles - zone subentries carry a motion/occupancy device class, output
+# subentries do not. Nothing to keep in sync when a zone is added.
+- sensor:
+    - name: Alarm Active Zones
+      unique_id: alarm_active_zones
+      icon: mdi:motion-sensor
+      state: >
+        {%- set ns = namespace(v=0) %}
+        {%- for e in integration_entities('satel_integra') %}
+        {%- if e.startswith('binary_sensor.')
+               and state_attr(e,'device_class') in ['motion','occupancy']
+               and states(e) == 'on' %}
+        {%- set ns.v = ns.v + 1 %}
+        {%- endif %}
+        {%- endfor %}
+        {{ ns.v }}
+      attributes:
+        names: >
+          {%- set ns = namespace(v=[]) %}
+          {%- for e in integration_entities('satel_integra') %}
+          {%- if e.startswith('binary_sensor.')
+                 and state_attr(e,'device_class') in ['motion','occupancy']
+                 and states(e) == 'on' %}
+          {%- set ns.v = ns.v + [state_attr(e,'friendly_name') or e.split('.')[1]] %}
+          {%- endif %}
+          {%- endfor %}
+          {{ ns.v }}
+

@@ -1,6 +1,8 @@
-type: custom:layout-card
-layout_type: masonry
-layout: {}
+# vertical-stack, not layout-card/masonry: masonry sizes each child from
+# getCardSize(), and the 8-tile grid over-reports its height, which left a
+# dead band between the last tile row and the history card. A vertical-stack
+# lays out in real DOM flow, so there is nothing to mis-estimate.
+type: vertical-stack
 cards:
   - type: custom:mushroom-template-card
     entity: alarm_control_panel.house
@@ -137,26 +139,148 @@ cards:
           confirmation:
             text: Trigger the PANIC alarm? This will sound the sirens.
         multiline_secondary: false
+      # The zone list is DISCOVERED, not hardcoded. integration_entities()
+      # returns everything the satel_integra config entry owns; zone subentries
+      # carry a motion/occupancy device class, output subentries do not, which
+      # is what separates them. Add a zone in HA and it appears here with no
+      # edit to this card - that was the whole point of guessing entity ids
+      # wrong twice.
       - type: custom:mushroom-template-card
         primary: Ready to Arm
         secondary: >
-          {% if is_state('binary_sensor.ready_to_arm','on') %}
+          {%- set ns = namespace(v=[]) %}
+          {%- for e in integration_entities('satel_integra') %}
+          {%- if e.startswith('binary_sensor.')
+                 and state_attr(e,'device_class') in ['motion','occupancy']
+                 and states(e) == 'on' %}
+          {%- set ns.v = ns.v + [state_attr(e,'friendly_name') or e.split('.')[1]] %}
+          {%- endif %}
+          {%- endfor %}
+          {%- if ns.v %}
+          {{ ns.v | join(', ') }}
+          {%- elif is_state('binary_sensor.ready_to_arm','on') %}
           ready
-          {% else %}
-          zone violated
-          {% endif %}
+          {%- elif states('binary_sensor.ready_to_arm') in ['unknown','unavailable'] %}
+          no detector active (panel ready status not wired - output 14)
+          {%- else %}
+          not ready - cause is outside the detector zones
+          {%- endif %}
         entity: binary_sensor.ready_to_arm
         icon: >
-          {{ "mdi:shield-check" if is_state('binary_sensor.ready_to_arm','on')
-          else "mdi:shield-alert" }}
-        icon_color: |
-          {% if is_state('binary_sensor.ready_to_arm','on') %}
-          green
+          {%- set ns = namespace(v=[]) %}
+          {%- for e in integration_entities('satel_integra') %}
+          {%- if e.startswith('binary_sensor.')
+                 and state_attr(e,'device_class') in ['motion','occupancy']
+                 and states(e) == 'on' %}
+          {%- set ns.v = ns.v + [state_attr(e,'friendly_name') or e.split('.')[1]] %}
+          {%- endif %}
+          {%- endfor %}
+          {{ "mdi:shield-alert" if ns.v else
+             ("mdi:shield-check" if is_state('binary_sensor.ready_to_arm','on')
+              else "mdi:shield-outline") }}
+        icon_color: >
+          {%- set ns = namespace(v=[]) %}
+          {%- for e in integration_entities('satel_integra') %}
+          {%- if e.startswith('binary_sensor.')
+                 and state_attr(e,'device_class') in ['motion','occupancy']
+                 and states(e) == 'on' %}
+          {%- set ns.v = ns.v + [state_attr(e,'friendly_name') or e.split('.')[1]] %}
+          {%- endif %}
+          {%- endfor %}
+          {{ 'orange' if ns.v else
+             ('green' if is_state('binary_sensor.ready_to_arm','on') else 'grey') }}
+        tap_action:
+          action: more-info
+        hold_action:
+          action: more-info
+        multiline_secondary: true
+      - type: custom:mushroom-template-card
+        entity: sensor.alarm_last_trigger
+        primary: >
+          {% if is_state('alarm_control_panel.house','triggered') %}
+          ALARM - {{ states('sensor.alarm_last_trigger') }}
           {% else %}
-          amber
+          Last trigger - {{ states('sensor.alarm_last_trigger') }}
+          {% endif %}
+        secondary: >
+          {% set at = state_attr('sensor.alarm_last_trigger','at') %}
+          {% if at %}
+          {{ as_local(as_datetime(at)).strftime('%a %-d %b %H:%M') }}
+          ({{ state_attr('sensor.alarm_last_trigger','alarm_state') | replace('_',' ') }})
+          {% else %}
+          no alarm recorded
+          {% endif %}
+        icon: mdi:shield-alert
+        icon_color: >
+          {% if is_state('alarm_control_panel.house','triggered') %}
+          red
+          {% elif states('sensor.alarm_last_trigger') not in ['unknown','unavailable'] %}
+          orange
+          {% else %}
+          grey
           {% endif %}
         tap_action:
           action: more-info
         hold_action:
           action: more-info
         multiline_secondary: false
+      # Same discovery as above. Deliberately NOT reading
+      # sensor.alarm_active_zones: that only exists after a template reload,
+      # and until then it reads `unknown`, which silently showed "All clear".
+      - type: custom:mushroom-template-card
+        entity: binary_sensor.ready_to_arm
+        primary: >
+          {%- set ns = namespace(v=[]) %}
+          {%- for e in integration_entities('satel_integra') %}
+          {%- if e.startswith('binary_sensor.')
+                 and state_attr(e,'device_class') in ['motion','occupancy']
+                 and states(e) == 'on' %}
+          {%- set ns.v = ns.v + [state_attr(e,'friendly_name') or e.split('.')[1]] %}
+          {%- endif %}
+          {%- endfor %}
+          {%- set n = ns.v | count %}
+          {{ 'All clear' if n == 0 else
+             n ~ ' zone' ~ ('' if n == 1 else 's') ~ ' active' }}
+        secondary: >
+          {%- set ns = namespace(v=[]) %}
+          {%- for e in integration_entities('satel_integra') %}
+          {%- if e.startswith('binary_sensor.')
+                 and state_attr(e,'device_class') in ['motion','occupancy']
+                 and states(e) == 'on' %}
+          {%- set ns.v = ns.v + [state_attr(e,'friendly_name') or e.split('.')[1]] %}
+          {%- endif %}
+          {%- endfor %}
+          {{ ns.v | join(', ') if ns.v else 'no movement' }}
+        icon: mdi:motion-sensor
+        icon_color: >
+          {%- set ns = namespace(v=[]) %}
+          {%- for e in integration_entities('satel_integra') %}
+          {%- if e.startswith('binary_sensor.')
+                 and state_attr(e,'device_class') in ['motion','occupancy']
+                 and states(e) == 'on' %}
+          {%- set ns.v = ns.v + [state_attr(e,'friendly_name') or e.split('.')[1]] %}
+          {%- endif %}
+          {%- endfor %}
+          {{ 'orange' if ns.v else 'grey' }}
+        tap_action:
+          action: more-info
+        multiline_secondary: true
+
+  # History, newest first. Reads the rolling attribute on the trigger sensor,
+  # which survives restarts.
+  - type: markdown
+    title: Alarm trigger history
+    # Literal block (|), not folded (>): a folded scalar joins lines with
+    # spaces, which collapses the whole table onto one line. Whitespace-control
+    # tags ({%- -%}) keep the Jinja lines from rendering as blank rows.
+    content: |-
+      {%- set h = state_attr('sensor.alarm_last_trigger','history') or [] %}
+      {%- if h | count == 0 -%}
+      _No triggers recorded._
+      {%- else -%}
+      | When | Zone | State |
+      |---|---|---|
+      {%- for e in h | reverse %}
+      | {{ as_local(as_datetime(e.at)).strftime('%-d %b %H:%M') }} | {{ e.name }} | {{ e.alarm_state | replace('_',' ') }} |
+      {%- endfor %}
+      {%- endif %}

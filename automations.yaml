@@ -884,7 +884,7 @@
   triggers:
   - trigger: state
     entity_id:
-    - binary_sensor.kitchen
+    - binary_sensor.kitchen_motion
     to: 'on'
   conditions:
   - condition: and
