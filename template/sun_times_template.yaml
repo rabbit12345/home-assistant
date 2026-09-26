@@ -1,0 +1,51 @@
+  - sensor:
+    # Today's sunrise and sunset as local clock times, for dashboard display.
+    # sun.sun only publishes the NEXT rising/setting, so a value that falls on a
+    # later date is stepped back a day. That step is taken on the epoch timestamp
+    # so it is 24 absolute hours: subtracting a day from a zone-aware datetime
+    # shifts the wall clock instead, which is an hour wrong on the two DST
+    # changeover days. Same maths as light_timer_blueprint.yaml, so the tile and
+    # the light schedule can never disagree.
+    - name: Sunrise Time
+      unique_id: sunrise_time
+      icon: mdi:weather-sunset-up
+      state: >-
+        {% set nr = state_attr('sun.sun', 'next_rising') %}
+        {% if nr %}
+          {% set nr = nr | as_datetime %}
+          {% set today = nr | as_local if (nr | as_local).date() == now().date()
+                         else ((nr | as_timestamp) - 86400) | as_datetime | as_local %}
+          {{ today.strftime('%H:%M') }}
+        {% else %}
+          unknown
+        {% endif %}
+      attributes:
+        timestamp: >-
+          {% set nr = state_attr('sun.sun', 'next_rising') %}
+          {% if nr %}
+            {% set nr = nr | as_datetime %}
+            {{ (nr | as_local if (nr | as_local).date() == now().date()
+                else ((nr | as_timestamp) - 86400) | as_datetime | as_local).isoformat() }}
+          {% endif %}
+
+    - name: Sunset Time
+      unique_id: sunset_time
+      icon: mdi:weather-sunset-down
+      state: >-
+        {% set ns = state_attr('sun.sun', 'next_setting') %}
+        {% if ns %}
+          {% set ns = ns | as_datetime %}
+          {% set today = ns | as_local if (ns | as_local).date() == now().date()
+                         else ((ns | as_timestamp) - 86400) | as_datetime | as_local %}
+          {{ today.strftime('%H:%M') }}
+        {% else %}
+          unknown
+        {% endif %}
+      attributes:
+        timestamp: >-
+          {% set ns = state_attr('sun.sun', 'next_setting') %}
+          {% if ns %}
+            {% set ns = ns | as_datetime %}
+            {{ (ns | as_local if (ns | as_local).date() == now().date()
+                else ((ns | as_timestamp) - 86400) | as_datetime | as_local).isoformat() }}
+          {% endif %}

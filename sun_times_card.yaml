@@ -1,0 +1,16 @@
+# Sunrise / sunset tiles. Paste into a dashboard via
+# Edit dashboard > Add card > Manual.
+# Needs the Sunrise Time / Sunset Time sensors from
+# template/sun_times_template.yaml.
+type: horizontal-stack
+cards:
+  - type: tile
+    entity: sensor.sunrise_time
+    name: Sunrise
+    icon: mdi:weather-sunset-up
+    color: amber
+  - type: tile
+    entity: sensor.sunset_time
+    name: Sunset
+    icon: mdi:weather-sunset-down
+    color: deep-orange
