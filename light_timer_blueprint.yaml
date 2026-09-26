@@ -16,8 +16,9 @@ blueprint:
     Requires three helpers per instance, created at
     Settings > Devices & Services > Helpers:
     a Timer (the hold countdown), a Number (hold duration in minutes) and a
-    Toggle (enables the timer behaviour). A fourth, optional Toggle switches the
-    overnight schedule on; leave it blank to run at any hour.
+    Toggle (enables the timer behaviour). A fourth, optional Toggle is the master
+    switch: on, the lights come on for activity during the overnight window; off,
+    nothing fires at all; blank, activity acts at any hour.
   domain: automation
   source_url: https://community.home-assistant.io/
 
@@ -145,16 +146,18 @@ blueprint:
           mode: slider
 
     sunset_schedule_toggle:
-      name: Overnight Schedule Toggle (optional)
+      name: Overnight Schedule Toggle (optional master switch)
       description: >-
-        Optional extra helper: an input_boolean that switches the overnight
-        window on. While it is on, activity sensors only act between
+        Optional extra helper: an input_boolean that acts as the master switch for
+        the whole instance.
+        While it is ON, activity sensors turn the lights on, but only between
         sunset + Window Start Offset and sunrise + Window End Offset the next
         morning, and the lights are swept off when the window closes.
-        While it is off there is no window at all and activity sensors run at any
-        hour.
-        Leave this blank if the instance never needs a window - the two Window
-        Offset inputs below are then unused. Create at
+        While it is OFF nothing fires at all: activity is ignored at every hour,
+        and a hold timer that expires turns the lights off rather than restoring
+        or dimming them.
+        Leave it blank to remove the gate entirely - activity then acts around the
+        clock and the two Window Offset inputs below are unused. Create at
         Settings > Devices & Services > Helpers > Toggle.
       default: []
       selector:
@@ -238,13 +241,17 @@ variables:
   enabled: "{{ is_state(enable_toggle_var, 'on') }}"
 
   # The schedule toggle is optional, so it arrives as a list that is empty when
-  # no helper was picked - which means no window at all.
+  # no helper was picked.
+  schedule_picked: "{{ sunset_schedule_var | count > 0 }}"
   schedule_on: >-
     {{ sunset_schedule_var | count > 0
        and is_state(sunset_schedule_var[0], 'on') }}
 
-  # Activity window. With no window toggle, or with it off, the window is always
-  # open; otherwise it opens at today's sunset + start offset and closes at
+  # Activity window, and the master gate. The schedule toggle decides whether the
+  # lights may come on at all: switched off, nothing fires at any hour; switched
+  # on, activity acts but only inside the window. With no toggle helper picked
+  # there is no gate and activity acts around the clock.
+  # The window opens at today's sunset + start offset and closes at
   # today's sunrise + end offset, so it wraps through midnight: everything from
   # this evening onwards is inside it, and so is everything up to this morning's
   # close. The single "at or after the open OR before the close" test covers both
@@ -258,8 +265,10 @@ variables:
   # thing to hold fixed). The date comparison stays in local time, where "today"
   # is defined.
   in_window: >-
-    {% if not schedule_on %}
+    {% if not schedule_picked %}
       {{ true }}
+    {% elif not schedule_on %}
+      {{ false }}
     {% else %}
       {% set on_p = (sunset_on_offset_var | replace('-', '')).split(':') | map('int') | list %}
       {% set on_s = (on_p[0] * 3600 + on_p[1] * 60 + (on_p[2] if on_p | count > 2 else 0))
