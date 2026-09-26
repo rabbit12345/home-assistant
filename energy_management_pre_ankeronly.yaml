@@ -1,0 +1,330 @@
+type: horizontal-stack
+cards:
+  - type: vertical-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.solix_home_demand_2
+        name: House
+        fill_container: false
+      - type: custom:mushroom-template-card
+        primary: Consumption
+        entity: sensor.solix_home_consumption_today
+        secondary: >
+          {%- set kwh = states('sensor.solix_home_consumption_today') | float(0) -%} {{ kwh
+          | round(2) }} kWh
+        icon: mdi:home-lightning-bolt
+        icon_color: >
+          {% set kwh = states('sensor.solix_home_consumption_today') | float(0)
+          / 1000 %} {%- if kwh > 10 -%}
+            green
+          {%- elif kwh > 5 -%}
+            amber
+          {%- else -%}
+            orange
+          {%- endif -%}
+        fill_container: true
+        tap_action:
+          action: more-info
+        multiline_secondary: false
+      - type: custom:mushroom-template-card
+        primary: From Battery
+        entity: sensor.solix_battery_consumption_today
+        secondary: >
+          {%- set kwh = states('sensor.solix_battery_consumption_today') | float(0) -%} {{
+          kwh | round(2) }} kWh
+        icon: mdi:home-battery
+        icon_color: >
+          {% set kwh = states('sensor.solix_battery_consumption_today') |
+          float(0) / 1000 %} {%- if kwh > 10 -%}
+            green
+          {%- elif kwh > 5 -%}
+            amber
+          {%- else -%}
+            orange
+          {%- endif -%}
+        fill_container: true
+        tap_action:
+          action: more-info
+        multiline_secondary: false
+      - type: custom:mushroom-template-card
+        primary: From Grid
+        entity: sensor.solix_grid_import_today
+        secondary: >
+          {%- set kwh = states('sensor.solix_grid_import_today') | float(0) -%} {{ kwh |
+          round(2) }} kWh
+        icon: mdi:transmission-tower
+        icon_color: >
+          {% set kwh = states('sensor.solix_grid_import_today') | float(0) /
+          1000 %} {%- if kwh > 10 -%}
+            green
+          {%- elif kwh > 5 -%}
+            amber
+          {%- else -%}
+            orange
+          {%- endif -%}
+        fill_container: true
+        tap_action:
+          action: more-info
+        multiline_secondary: false
+      - type: custom:mushroom-template-card
+        primary: From Solar
+        entity: sensor.solix_pv_consumption_today
+        secondary: >
+          {%- set kwh = states('sensor.solix_pv_consumption_today') | float(0) -%} {{ kwh |
+          round(2) }} kWh
+        icon: mdi:solar-power-variant
+        icon_color: >
+          {% set kwh = states('sensor.solix_pv_consumption_today') | float(0) /
+          1000 %} {%- if kwh > 10 -%}
+            green
+          {%- elif kwh > 5 -%}
+            amber
+          {%- else -%}
+            orange
+          {%- endif -%}
+        fill_container: true
+        tap_action:
+          action: more-info
+        multiline_secondary: false
+      - type: custom:mushroom-template-card
+        primary: X1 Battery
+        secondary: >
+          {% set s = states('sensor.x1_h8k_host_state_of_charge')|float(0) %} {%
+          set t = 40|float(0) %} {% set cap = (s * t / 100) %}          
+          {{states('sensor.x1_h8k_host_state_of_charge')}}%  {{ cap  }} kWH
+        icon: mdi:battery-50
+        icon_color: blue
+        entity: sensor.x1_h8k_host_state_of_charge
+        hold_action:
+          action: more-info
+        double_tap_action:
+          action: more-info
+        tap_action:
+          action: more-info
+      - type: custom:mushroom-entity-card
+        entity: sensor.energy_home_demand_daily
+        name: Consumption
+      - type: custom:mushroom-entity-card
+        entity: sensor.energy_net_to_grid_today
+        name: Export
+        fill_container: false
+      - type: custom:mushroom-entity-card
+        entity: sensor.amber_express_wilson_feed_in_price
+        name: Feed In Prc
+        fill_container: false
+      - type: custom:mushroom-entity-card
+        entity: switch.overseas
+        hold_action:
+          action: more-info
+        tap_action:
+          action: none
+        double_tap_action:
+          action: more-info
+  - type: vertical-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.solix_solar_power_2
+        name: Solar
+      - type: custom:mushroom-template-card
+        primary: Production
+        entity: sensor.solix_pv_yield_today
+        secondary: >
+          {%- set kwh = states('sensor.solix_pv_yield_today') | float(0) -%} {{ kwh |
+          round(2) }} kWh
+        icon: mdi:solar-power
+        icon_color: >
+          {% set kwh = states('sensor.solix_pv_yield_today') | float(0) / 1000
+          %} {%- if kwh > 10 -%}
+            green
+          {%- elif kwh > 5 -%}
+            amber
+          {%- else -%}
+            orange
+          {%- endif -%}
+        fill_container: false
+        tap_action:
+          action: more-info
+      - type: custom:mushroom-template-card
+        primary: To battery
+        entity: sensor.solix_pv_charge_today
+        secondary: >
+          {%- set kwh = states('sensor.solix_pv_charge_today') | float(0) -%} {{ kwh |
+          round(2) }} kWh
+        icon: mdi:solar-power
+        icon_color: >
+          {% set kwh = states('sensor.solix_pv_charge_today') | float(0) / 1000
+          %} {%- if kwh > 10 -%}
+            green
+          {%- elif kwh > 5 -%}
+            amber
+          {%- else -%}
+            orange
+          {%- endif -%}
+        fill_container: false
+        tap_action:
+          action: more-info
+      - type: custom:mushroom-template-card
+        primary: To home
+        entity: sensor.solix_pv_consumption_today
+        secondary: >
+          {%- set kwh = states('sensor.solix_pv_consumption_today') | float(0) -%} {{ kwh |
+          round(2) }} kWh
+        icon: mdi:solar-power
+        icon_color: >
+          {% set kwh = states('sensor.solix_pv_consumption_today') | float(0) /
+          1000 %} {%- if kwh > 10 -%}
+            green
+          {%- elif kwh > 5 -%}
+            amber
+          {%- else -%}
+            orange
+          {%- endif -%}
+        fill_container: false
+        tap_action:
+          action: more-info
+      - type: custom:mushroom-entity-card
+        name: "Home Usage "
+        entity: sensor.solix_home_demand_2
+      - type: custom:mushroom-entity-card
+        entity: sensor.solix_battery_charging_power
+        name: Charging
+      - type: custom:mushroom-entity-card
+        entity: sensor.energy_battery_charged_daily
+        name: Charged
+      - type: custom:mushroom-entity-card
+        entity: sensor.amber_express_wilson_general_price
+        name: Grid Prc
+      - type: custom:mushroom-template-card
+        primary: Dyson
+        entity: input_boolean.auto_dyson_heater
+        secondary: >
+          {{states('input_boolean.auto_dyson_heater')}} |
+          {{relative_time(states.input_boolean.auto_dyson_heater.last_changed)}}
+        icon: mdi:air-filter
+        icon_color: |
+          {% set switch_state=states(entity) %}
+          {% if switch_state=='on'%}
+          green
+          {% else %}
+          grey
+          {% endif %}
+        tap_action:
+          action: toggle
+        hold_action:
+          action: more-info
+        multiline_secondary: true
+  - type: vertical-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.solix_demand_solar_difference
+        fill_container: false
+        icon: mdi:doorbell
+        name: Net
+      - type: custom:mushroom-template-card
+        primary: Import
+        entity: sensor.solix_grid_import_combined_today
+        secondary: >
+          {%- set kwh = states('sensor.solix_grid_import_combined_today') | float(0) -%} {{
+          kwh | round(2) }} kWh
+        icon: mdi:transmission-tower
+        icon_color: >
+          {% set kwh = states('sensor.solix_grid_import_combined_today') |
+          float(0) / 1000 %} {%- if kwh > 10 -%}
+            green
+          {%- elif kwh > 5 -%}
+            amber
+          {%- else -%}
+            orange
+          {%- endif -%}
+        fill_container: false
+        tap_action:
+          action: more-info
+      - type: custom:mushroom-template-card
+        primary: To battery
+        entity: sensor.solix_grid_charged_today
+        secondary: >
+          {%- set kwh = states('sensor.solix_grid_charged_today') | float(0) -%} {{ kwh |
+          round(2) }} kWh
+        icon: mdi:transmission-tower-export
+        icon_color: >
+          {% set kwh = states('sensor.solix_grid_charged_today') | float(0) /
+          1000 %} {%- if kwh > 10 -%}
+            green
+          {%- elif kwh > 5 -%}
+            amber
+          {%- else -%}
+            orange
+          {%- endif -%}
+        fill_container: false
+        tap_action:
+          action: more-info
+      - type: custom:mushroom-template-card
+        primary: To home
+        entity: sensor.solix_grid_import_today
+        secondary: >
+          {%- set kwh = states('sensor.solix_grid_import_today') | float(0) -%} {{ kwh |
+          round(2) }} kWh
+        icon: mdi:transmission-tower-export
+        icon_color: >
+          {% set kwh = states('sensor.solix_grid_import_today') | float(0) /
+          1000 %} {%- if kwh > 10 -%}
+            green
+          {%- elif kwh > 5 -%}
+            amber
+          {%- else -%}
+            orange
+          {%- endif -%}
+        fill_container: false
+        tap_action:
+          action: more-info
+      - type: custom:mushroom-entity-card
+        entity: sensor.solix_battery_discharging_power
+        name: Discharging
+      - type: custom:mushroom-entity-card
+        entity: sensor.energy_battery_discharged_daily
+        name: Discharged
+      - type: custom:mushroom-template-card
+        primary: Actron AC
+        entity: input_boolean.auto_actron_ac
+        secondary: >
+          {{states('input_boolean.auto_actron_ac')}} |
+          {{relative_time(states.input_boolean.auto_actron_ac.last_changed)}}
+        icon: mdi:air-conditioner
+        icon_color: |
+          {% set switch_state=states(entity) %}
+          {% if switch_state=='on'%}
+          green
+          {% else %}
+          grey
+          {% endif %}
+        tap_action:
+          action: toggle
+        hold_action:
+          action: more-info
+        multiline_secondary: true
+      - type: custom:mushroom-template-card
+        entity: binary_sensor.mqtt_monitor_ashqb71f39300081_forwarding_active
+        secondary: >
+          {{states('binary_sensor.mqtt_monitor_ashqb71f39300081_forwarding_active')}}
+          |
+          {{relative_time(states.mqtt_monitor_ashqb71f39300081_forwarding_active.last_changed)}}
+        icon: mdi:forward
+        icon_color: |
+          {% set switch_state=states(entity) %}
+          {% if switch_state=='on'%}
+          green
+          {% else %}
+          grey
+          {% endif %}
+        tap_action:
+          action: toggle
+        hold_action:
+          action: more-info
+        multiline_secondary: true
+        primary: Mqtt Monitor
+      - type: custom:mushroom-template-card
+        primary: Hello, {{user}}
+        secondary: How are you?
+        icon: mdi:home
+        entity: sensor.solix_battery_discharged_today
+title: Energy

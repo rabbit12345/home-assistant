@@ -27,7 +27,7 @@ filter:
           {% else %}red
           {% endif %}
         primary: "{{ state_attr(config.entity, 'friendly_name') | regex_replace('(?i)\\s*battery\\s*$', '') }}"
-        secondary: "🔋 {{ states(config.entity) | default('—') }}% | ⏱️ {{ relative_time(states[config.entity].last_changed) }}"
+        secondary: "🔋 {{ states(config.entity) | default('—') }}% | ⏱️ {{ relative_time(states[config.entity].last_changed) if states[config.entity] is not none else '—' }}"
         layout: horizontal
         multiline_secondary: false
         fill_container: false
