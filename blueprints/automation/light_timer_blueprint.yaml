@@ -353,14 +353,22 @@ actions:
               # timer.change is rejected if it would push the remaining time past
               # the duration the timer was started with, so add only the headroom
               # that is actually left.
+              # The remaining time is deliberately over-estimated by ~2s. HA does
+              # not use the figure below: it recomputes remaining itself, at
+              # service-call time, as end - now() with the microseconds floored off
+              # - which makes its figure up to a second LARGER than a true reading,
+              # and larger still than a round-to-nearest one. Truncating (int
+              # floors) and adding 2 guarantees this estimate is never lower than
+              # the one HA will check against, so the sum cannot tip over the
+              # duration. The cost is up to 2s of extension accuracy.
               - variables:
                   extend_by: >-
                     {% set d = (state_attr(timer_var, 'duration') | default('0:00:00', true))
                                .split(':') | map('int') | list %}
                     {% set attr_total = d[0] * 3600 + d[1] * 60 + d[2] %}
                     {% set total = [hold_mins | int * 60, attr_total] | min %}
-                    {% set remaining = (state_attr(timer_var, 'finishes_at')
-                                        | as_datetime - now()).total_seconds() | round(0) | int %}
+                    {% set remaining = ((state_attr(timer_var, 'finishes_at')
+                                         | as_datetime - now()).total_seconds() | int) + 2 %}
                     {{ [extend_seconds_var | int(60), total - remaining] | min }}
               - condition: template
                 value_template: "{{ extend_by | int(0) > 0 }}"
